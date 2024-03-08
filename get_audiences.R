@@ -1,6 +1,9 @@
 # Get command-line arguments
 # tf <- commandArgs(trailingOnly = TRUE)
 
+unlink("targeting", recursive = T, force = T)
+unlink("historic", recursive = T, force = T)
+
 outcome <- commandArgs(trailingOnly = TRUE)
 
 sets <- list()
@@ -29,15 +32,22 @@ library(piggyback)
 # title_txt[which(str_detect(title_txt, "title"))[1]] <-  glue::glue('  title: "{sets$dashboard}"')
 # write_lines(title_txt, "_site/_quarto.yml")
 
+full_cntry_list <- read_rds("https://github.com/favstats/meta_ad_reports/raw/main/cntry_list.rds") %>% 
+  rename(iso2c = iso2,
+         country = cntry) 
+
 if(Sys.info()[["sysname"]]=="Windows"){
   ### CHANGE ME WHEN LOCAL!
   tf <- "30"
-  sets$cntry <- "NP"
+  sets$cntry <- "MY"
   print(paste0("TF: ", tf))
   print(paste0("cntry: ", sets))
   
 }
 
+# for (cntryy in full_cntry_list$iso2c) {
+#  sets$cntry <-  cntryy
+ # print(sets$cntry)
 
 # if()
 
@@ -245,7 +255,7 @@ all_dat <- #read_csv("nl_advertisers.csv") %>%
   filter(!remove_em) %>%
   # filter(n >= 2) %>%
   # filter(n >= 2 & str_ends(page_id, "0", negate = T)) %>%
-  select(-n) 
+  select(-n, -contains("no_data")) 
 
 
 # all_dat %>% filter(str_detect(page_name, "GroenLinks-PvdA"))
@@ -267,7 +277,7 @@ scraper <- function(.x, time = tf) {
   
   if(nrow(fin)!=0){
     if(!dir.exists(glue::glue("targeting/{time}"))){
-      dir.create(glue::glue("targeting/{time}"))
+      dir.create(glue::glue("targeting/{time}"), recursive = T)
     }
     
     path <- paste0(glue::glue("targeting/{time}/"),.x$page_id, ".rds")
@@ -325,7 +335,9 @@ if(new_ds == latest_ds){
       bind_rows(latest_elex) %>% 
       distinct()
 
+    dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
     current_date <- paste0("historic/",  as.character(new_ds), "/", "last_",tf,"_days")
+    
     arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
     
     # arrow::read_parquet(paste0(current_date, ".parquet")) %>% View()
@@ -356,7 +368,7 @@ if(new_ds == latest_ds){
 
 # saveRDS(election_dat, paste0("data/election_dat", tf, ".rds"))
 
-
+# f
 
 # election_dat <- arrow::read_parquet("historic/2024-03-05/30.parquet")
 
@@ -370,18 +382,20 @@ the_date <- new_ds
 # cntry_name
 
 # reeeleases <- get_full_release()
+releeasee <- get_full_release()
 
+cntry_name <- full_cntry_list %>% 
+  filter(iso2c == sets$cntry) %>% 
+  pull(country)
 
 # if(!(the_tag %in% release_names)){
   pb_release_create_fr(repo = "favstats/meta_ad_targeting", 
                        tag = the_tag,
-                       body = paste0("This release includes ", sets$cntry ," '", "last_",tf,"_days" ,"' Meta ad target audiences."), 
-                       releases = NULL)    # Sys.sleep(5)
+                       body = paste0("This release includes ", cntry_name ," '", "last_",tf,"_days" ,"' Meta ad target audiences."), 
+                       releases = releeasee)    # Sys.sleep(5)
 # }
 
 file.copy(paste0(current_date, ".parquet"), paste0(the_date, ".parquet"), overwrite = T)
-
-releeasee <- get_full_release()
 
 try({
   # print(paste0(the_date, ".rds"))
@@ -393,6 +407,8 @@ try({
   
   
 })
+
+file.remove(paste0(the_date, ".parquet"))
 
 
 gc()
@@ -417,6 +433,7 @@ unlink("historic", recursive = T, force = T)
 
 print("################6")
 
+# }
 
 # unlink("node_modules", recursive = T, force = T)
 # unlink("out", recursive = T, force = T)

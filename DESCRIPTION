@@ -37,6 +37,7 @@ Imports:
 		vroom,
 		DT,
 		piggyback,
+		prettydoc,
 		arrow
 Depends:
     R (>= 3.0.0)

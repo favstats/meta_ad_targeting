@@ -55,6 +55,7 @@ jobs:
             any::digest
             any::glue
             any::vroom
+            any::prettydoc
             any::DT
             any::piggyback
             any::arrow
