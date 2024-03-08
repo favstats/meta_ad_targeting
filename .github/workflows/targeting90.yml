@@ -67,6 +67,5 @@ jobs:
           libxml2-dev \
           libharfbuzz-dev \
           libfribidi-dev
-      - run: echo "🍏 This job's status is ${{ job.status }}."
       - name: "Script - Meta Run""
         run: Rscript 'get_audiences.R' "90" 

@@ -66,7 +66,6 @@ jobs:
           libcurl4-openssl-dev \
           libxml2-dev \
           libharfbuzz-dev \
-          libfribidi-dev
-      - run: echo "🍏 This job's status is ${{ job.status }}."
+          libfribidi-devx
       - name: "Script - Meta Run""
-        run: Rscript 'get_audiences.R' "7" 
+        run: Rscript 'get_audiences.R' "7"    
