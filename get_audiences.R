@@ -48,9 +48,9 @@ if(Sys.info()[["sysname"]]=="Windows"){
   
 }
 
-# for (cntryy in full_cntry_list$iso2c) {
-#  sets$cntry <-  cntryy
-#  print(sets$cntry)
+for (cntryy in full_cntry_list$iso2c) {
+ sets$cntry <-  cntryy
+ print(sets$cntry)
 
 # if()
 
@@ -449,7 +449,7 @@ unlink("historic", recursive = T, force = T)
 
 print("################6")
 
-# }
+}
 
 # unlink("node_modules", recursive = T, force = T)
 # unlink("out", recursive = T, force = T)
