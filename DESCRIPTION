@@ -1,0 +1,43 @@
+Package: TK2023
+Type: Package
+Title: 
+Version: 0.9.9
+Author: Fabio Votta (f.a.votta@uva.nl)
+Maintainer: Fabio Votta <f.a.votta@uva.nl>
+Description: Dutch 2021 Election dashboard
+URL: https://github.com/groene/TK2023.R
+BugReports: https://github.com/groene/TK2023.R/issues
+Imports:
+		tidyverse,
+		httr,
+		remotes,
+		shiny,
+		scales,
+		treemap,
+		here,
+		jsonlite,
+		janitor,
+		quarto,
+		highcharter,
+		lubridate,
+		gt,
+		gtExtras,
+		pacman,
+		openxlsx,
+		sf,
+		xml2,
+		rvest,
+		reticulate,
+		fs,
+		countrycode,
+		progress,
+		cli,
+		digest,
+		glue,
+		vroom,
+		DT,
+		piggyback,
+		arrow
+Depends:
+    R (>= 3.0.0)
+RoxygenNote: 5.0.1

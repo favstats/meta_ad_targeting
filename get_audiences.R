@@ -1,5 +1,5 @@
 # Get command-line arguments
-tf <- commandArgs(trailingOnly = TRUE)
+# tf <- commandArgs(trailingOnly = TRUE)
 
 outcome <- commandArgs(trailingOnly = TRUE)
 
@@ -7,6 +7,8 @@ sets <- list()
 tf <- outcome[1]
 sets$cntry <- outcome[2]
 # here::i_am("wtm_mx.Rproj")
+
+print(outcome)
 
 # setwd("template")
 # getwd()
@@ -19,6 +21,7 @@ library(httr)
 library(tidyverse)
 library(lubridate)
 library(rvest)
+library(piggyback)
 
 # sets <- jsonlite::fromJSON("settings.json")
 # 
@@ -44,20 +47,67 @@ new_ds <- jb %>% arrange(ds) %>% slice(1) %>% pull(ds)
 # new_ds <- "2023-01-01"
 
 try({
-  latest_elex <- readRDS(paste0("data/election_dat", tf, ".rds"))
+  # latest_elex <- readRDS(paste0("data/election_dat", tf, ".rds"))
+  
+  out <- sets$cntry %>% 
+    map(~{
+      .x %>% 
+        paste0(c("-last_7_days", "-last_30_days", 
+                 "-last_90_days"))
+    }) %>% 
+    unlist() %>% 
+    keep(~str_detect(.x, tf)) %>% 
+    # .[100:120] %>% 
+    map_dfr_progress(~{
+      the_assets <- httr::GET(paste0("https://github.com/favstats/meta_ad_targeting/releases/expanded_assets/", .x))
+      
+      the_assets %>% httr::content() %>% 
+        html_elements(".Box-row") %>% 
+        html_text()  %>%
+        tibble(raw = .)   %>%
+        # Split the raw column into separate lines
+        mutate(raw = strsplit(as.character(raw), "\n")) %>%
+        # Extract the relevant lines for filename, file size, and timestamp
+        transmute(
+          filename = sapply(raw, function(x) trimws(x[3])),
+          file_size = sapply(raw, function(x) trimws(x[6])),
+          timestamp = sapply(raw, function(x) trimws(x[7]))
+        ) %>% 
+        filter(filename != "Source code") %>% 
+        mutate(release = .x) %>% 
+        mutate_all(as.character)
+    })
+  
+  thosearethere <- out %>% 
+    rename(tag = release,
+           file_name = filename) %>% 
+    arrange(desc(tag)) %>% 
+    separate(tag, into = c("cntry", "tframe"), remove = F, sep = "-") %>% 
+    mutate(ds  = str_remove(file_name, "\\.rds|\\.zip|\\.parquet")) %>% 
+    distinct(cntry, ds, tframe) %>% 
+    drop_na(ds) %>% 
+    arrange(desc(ds))
+  
+  try({
+    latest_elex <- arrow::read_parquet(paste0("https://github.com/favstats/meta_ad_targeting/releases/download/", sets$cntry, "-last_", tf,"_days/", thosearethere$ds[1], ".parquet"))
+  })
+  
+  if(!exists("latest_elex")){
+    latest_elex <- tibble()
+  }
+  
+  if(!("ds" %in% names(latest_elex))){
+    latest_elex <- latest_elex %>% mutate(ds = "")
+  }
+  
+  latest_ds <- thosearethere$ds[1]
+  
 })
 
-if(!exists("latest_elex")){
-  latest_elex <- tibble()
-}
 
-if(!("ds" %in% names(latest_elex))){
-  latest_elex <- latest_elex %>% mutate(ds = "")
-}
-
-latest_ds <- latest_elex %>% arrange(ds) %>% slice(1) %>% pull(ds)
-
-if(length(latest_ds)==0){
+if(!exists("latest_ds")){
+  latest_ds <- "2023-01-01"
+} else if(is.na(latest_ds)){
   latest_ds <- "2023-01-01"
 }
 
@@ -128,7 +178,7 @@ try({
                  "-last_90_days"))
     }) %>% 
     unlist() %>% 
-    .[str_detect(., "last_90_days")] %>% 
+    .[str_detect(., "last_90_days")] %>%
     # .[100:120] %>% 
     map_dfr_progress(~{
       the_assets <- httr::GET(paste0("https://github.com/favstats/meta_ad_reports/releases/expanded_assets/", .x))
@@ -272,9 +322,10 @@ if(new_ds == latest_ds){
       mutate_at(vars(contains("total_spend_formatted")), ~parse_number(as.character(.x))) %>% 
       rename(page_id = internal_id) %>%
       left_join(all_dat) %>% 
-      bind_rows(latest_elex)    
+      bind_rows(latest_elex) %>% 
+      distinct()
 
-    current_date <- paste0("historic/",  as.character(new_ds), "/", tf)
+    current_date <- paste0("historic/",  as.character(new_ds), "/", "last_",tf,"_days")
     arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
     
     # arrow::read_parquet(paste0(current_date, ".parquet")) %>% View()
@@ -296,46 +347,52 @@ if(new_ds == latest_ds){
     left_join(all_dat) 
 
   dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
-  current_date <- paste0("historic/",  as.character(new_ds), "/", tf)
-
+  current_date <- paste0("historic/",  as.character(new_ds), "/", "last_",tf,"_days")
+  
   arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
   
 
 }
 
-saveRDS(election_dat, paste0("data/election_dat", tf, ".rds"))
+# saveRDS(election_dat, paste0("data/election_dat", tf, ".rds"))
 
-##### combinations ####
 
+
+# election_dat <- arrow::read_parquet("historic/2024-03-05/30.parquet")
 
 # sources("start.R")
 
-the_tag <- paste0(sets$cntry, "-", tf)
+the_tag <- paste0(sets$cntry, "-", "last_",tf,"_days")
+the_date <- new_ds
 
 # full_repos
 
 # cntry_name
 
+# reeeleases <- get_full_release()
+
+
 # if(!(the_tag %in% release_names)){
   pb_release_create_fr(repo = "favstats/meta_ad_targeting", 
                        tag = the_tag,
-                       body = paste0("This release includes ", sets$cntry ," '", tf ,"' Meta ad target audiences."), 
+                       body = paste0("This release includes ", sets$cntry ," '", "last_",tf,"_days" ,"' Meta ad target audiences."), 
                        releases = NULL)    # Sys.sleep(5)
 # }
 
-file.copy(report_path, paste0(the_date, ".zip"), overwrite = T)
+file.copy(paste0(current_date, ".parquet"), paste0(the_date, ".parquet"), overwrite = T)
+
+releeasee <- get_full_release()
 
 try({
   # print(paste0(the_date, ".rds"))
   # print(the_tag)
   # debugonce(pb_upload_file_fr)
   # debugonce(pb_upload_file_fr)
-  pb_upload_file_fr(paste0(the_date, ".rds"), repo = "favstats/meta_ad_targeting", tag = the_tag, releases = full_repos)
+  pb_upload_file_fr(paste0(the_date, ".parquet"), repo = "favstats/meta_ad_targeting", tag = the_tag, releases = releeasee)
   # pb_upload_file_fr(paste0(the_date, ".zip"), repo = "favstats/meta_ad_reports", tag = the_tag, releases = full_repos)
   
   
 })
-
 
 
 gc()
@@ -355,8 +412,8 @@ print("NL UNZIPPED")
 
 
 
-unlink("node_modules", recursive = T, force = T)
-unlink("out", recursive = T, force = T)
+unlink("targeting", recursive = T, force = T)
+unlink("historic", recursive = T, force = T)
 
 print("################6")
 
