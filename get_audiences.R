@@ -41,7 +41,7 @@ full_cntry_list <- read_rds("https://github.com/favstats/meta_ad_reports/raw/mai
 
 if(Sys.info()[["sysname"]]=="Windows"){
   ### CHANGE ME WHEN LOCAL!
-  tf <- "7"
+  tf <- "30"
   sets$cntry <- "LU"
   print(paste0("TF: ", tf))
   print(paste0("cntry: ", sets))
@@ -50,7 +50,7 @@ if(Sys.info()[["sysname"]]=="Windows"){
 
 # for (cntryy in full_cntry_list$iso2c) {
 #  sets$cntry <-  cntryy
- # print(sets$cntry)
+#  print(sets$cntry)
 
 # if()
 
@@ -394,12 +394,17 @@ cntry_name <- full_cntry_list %>%
   filter(iso2c == sets$cntry) %>% 
   pull(country)
 
-# if(!(the_tag %in% release_names)){
+try({
+  ## TODO: needs to change once you got all countries
+  
+  # if(!(the_tag %in% release_names)){
   pb_release_create_fr(repo = "favstats/meta_ad_targeting", 
                        tag = the_tag,
                        body = paste0("This release includes ", cntry_name ," '", "last_",tf,"_days" ,"' Meta ad target audiences."), 
                        releases = releeasee)    # Sys.sleep(5)
-# }
+  # }
+  
+})
 
 file.copy(paste0(current_date, ".parquet"), paste0(the_date, ".parquet"), overwrite = T)
 
