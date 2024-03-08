@@ -34,12 +34,15 @@ library(piggyback)
 
 full_cntry_list <- read_rds("https://github.com/favstats/meta_ad_reports/raw/main/cntry_list.rds") %>% 
   rename(iso2c = iso2,
-         country = cntry) 
+         country = cntry) %>% 
+  sample_n(n())
+
+# full_cntry_list$iso2c %>% dput()
 
 if(Sys.info()[["sysname"]]=="Windows"){
   ### CHANGE ME WHEN LOCAL!
-  tf <- "30"
-  sets$cntry <- "MY"
+  tf <- "7"
+  sets$cntry <- "LU"
   print(paste0("TF: ", tf))
   print(paste0("cntry: ", sets))
   
@@ -382,7 +385,10 @@ the_date <- new_ds
 # cntry_name
 
 # reeeleases <- get_full_release()
-releeasee <- get_full_release()
+# releeasee <- get_full_release()
+
+# saveRDS(releeasee %>% drop_na(), file = "data/releeasee.rds")
+releeasee <- readRDS("data/releeasee.rds")
 
 cntry_name <- full_cntry_list %>% 
   filter(iso2c == sets$cntry) %>% 
@@ -397,7 +403,12 @@ cntry_name <- full_cntry_list %>%
 
 file.copy(paste0(current_date, ".parquet"), paste0(the_date, ".parquet"), overwrite = T)
 
+
+
 try({
+  ## TODO: needs to change once you got all countries
+  releeasee <- get_full_release()
+  
   # print(paste0(the_date, ".rds"))
   # print(the_tag)
   # debugonce(pb_upload_file_fr)
