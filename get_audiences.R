@@ -220,7 +220,7 @@ try({
     arrange(desc(tag)) %>% 
     separate(tag, into = c("country", "timeframe"), remove = F, sep = "-") %>% 
     filter(str_detect(file_name, "rds")) %>% 
-    mutate(day  = str_remove(file_name, "\\.rds|\\.zip") %>% lubridate::ymd()) %>% 
+    mutate(day  = str_remove(file_name, "\\.rds|\\.zip|\\.parquet") %>% lubridate::ymd()) %>% 
     arrange(desc(day)) %>% 
     group_by(country) %>% 
     slice(1) %>% 
