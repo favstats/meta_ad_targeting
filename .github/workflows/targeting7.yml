@@ -66,6 +66,6 @@ jobs:
           libcurl4-openssl-dev \
           libxml2-dev \
           libharfbuzz-dev \
-          libfribidi-devx
-      - name: "Script - Meta Run""
+          libfribidi-dev
+      - name: "Script - Meta Run"
         run: Rscript 'get_audiences.R' "7"    
