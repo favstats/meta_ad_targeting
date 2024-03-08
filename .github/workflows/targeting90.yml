@@ -67,5 +67,5 @@ jobs:
           libxml2-dev \
           libharfbuzz-dev \
           libfribidi-dev
-      - name: "Script - Meta Run""
+      - name: "Script - Meta Run"
         run: Rscript 'get_audiences.R' "90" 
