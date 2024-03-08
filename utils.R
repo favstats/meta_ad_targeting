@@ -611,22 +611,22 @@ pb_info_fr <- function(repo = guess_repo(),
 
 # Define a function to perform the operation
 get_full_release <- function() {
-  tryCatch({
+  # tryCatch({
     # Your original operation
     full_repos <- pb_info_fr("favstats/meta_ad_targeting") %>% as_tibble()
     
     return(full_repos)  # return the result
-  }, error = function(e) {
-    # Print the error message
-    print(paste("Error occurred: ", e$message))
-    
-    # Wait for an hour (3600 seconds)
-    print("Waiting for 1 hour before retrying...")
-    Sys.sleep(3600)
-    
-    # Retry the operation
-    return(get_full_release())
-  })
+  # }, error = function(e) {
+  #   # Print the error message
+  #   print(paste("Error occurred: ", e$message))
+  #   
+  #   # Wait for an hour (3600 seconds)
+  #   # print("Waiting for 1 hour before retrying...")
+  #   # Sys.sleep(3600)
+  #   
+  #   # Retry the operation
+  #   return(get_full_release())
+  # })
 }
 
 
