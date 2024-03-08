@@ -31,6 +31,7 @@ jobs:
                    "TN", "TO", "TR", "TT", "TV", "TW", "TZ", "UA", "UG", "US", "UY", 
                    "UZ", "VC", "VE", "VG", "VI", "VN", "VU", "WF", "WS", "YE", "YT", 
                    "ZA", "ZM", "ZW", "XK", "HK", "TL", "KR"]
+      max-parallel: 5
     permissions:
       contents: write
     env:
