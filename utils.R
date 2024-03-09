@@ -300,7 +300,7 @@ get_targeting <- function(id, timeframe = "LAST_30_DAYS") {
   
   contentwise <- httr::content(posted)
   
-  rate_limit <- str_detect(as.character(contentwise), "Rate limit exceeded")
+  rate_limit <<- str_detect(as.character(contentwise), "Rate limit exceeded")
   if(rate_limit){
     stop(as.character(contentwise))
   }
