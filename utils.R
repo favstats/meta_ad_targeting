@@ -511,6 +511,7 @@ pb_upload_file_fr <- function (file, repo, tag, .token = gh::gh_token(), release
       print("already there so we skip")
     }
     
+    print(paste0("Status CODE: ", httr::status_code(rsd)))
     httr::warn_for_status(rsd)
     # invisible(rsd)
     
