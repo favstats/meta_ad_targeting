@@ -61,6 +61,8 @@ for (cntryy in full_cntry_list$iso2c) {
   new_ds <- jb %>% arrange(ds) %>% slice(1) %>% pull(ds)
   # new_ds <- "2023-01-01"
   
+  print("################ LATEST TARGETING DATA ################")
+  
   try({
     # latest_elex <- readRDS(paste0("data/election_dat", tf, ".rds"))
     
@@ -168,6 +170,9 @@ for (cntryy in full_cntry_list$iso2c) {
     "ZA"
   )
   
+  print("################ WTM DATA ################")
+  
+  
   try({
     download.file(
       paste0(
@@ -204,6 +209,9 @@ for (cntryy in full_cntry_list$iso2c) {
     filter(cntry %in% sets$cntry) %>%
     mutate(sources = "tep") %>%
     rename(party = name_short)
+  
+  print("################ CHECK LATEST REPORT ################")
+  
   
   try({
     out <- sets$cntry %>%
@@ -353,6 +361,7 @@ for (cntryy in full_cntry_list$iso2c) {
   scraper <- possibly(scraper, otherwise = NULL, quiet = F)
   
   
+  print("################ RETRIEVE AUDIENCES ################")
   # if(F){
   #     # dir("provincies/7", full.names
   # }
@@ -451,8 +460,8 @@ for (cntryy in full_cntry_list$iso2c) {
     filter(iso2c == sets$cntry) %>%
     pull(country)
   
-  try({
-    # if(!(the_tag %in% release_names)){
+  # try({
+    if(!(the_tag %in% releases$release_names)){
     pb_release_create_fr(
       repo = "favstats/meta_ad_targeting",
       tag = the_tag,
@@ -462,15 +471,16 @@ for (cntryy in full_cntry_list$iso2c) {
       ),
       releases = releases
     )    # Sys.sleep(5)
-    # }
+    }
     
-  })
+  # })
   
   file.copy(paste0(current_date, ".parquet"),
             paste0(the_date, ".parquet"),
             overwrite = T)
   
   
+  print("################ UPLOAD FILE ################")
   
   try({
     # print(paste0(the_date, ".rds"))
@@ -487,6 +497,8 @@ for (cntryy in full_cntry_list$iso2c) {
     
     
   })
+  
+  print("################ UPLOADED FILE ################")
   
   file.remove(paste0(the_date, ".parquet"))
   
