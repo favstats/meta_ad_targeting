@@ -383,6 +383,15 @@ try({
     # da30 <- readRDS("data/election_dat30.rds")
     # da7 <- readRDS("data/election_dat7.rds")
     try({
+      
+      current_date <-
+        paste0("historic/",
+               as.character(new_ds),
+               "/",
+               "last_",
+               tf,
+               "_days")
+      
       if (new_ds == latest_ds) {
         print(glue::glue("New DS: {new_ds}: Old DS: {latest_ds}"))
         
@@ -409,13 +418,7 @@ try({
             distinct()
           
           dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
-          current_date <-
-            paste0("historic/",
-                   as.character(new_ds),
-                   "/",
-                   "last_",
-                   tf,
-                   "_days")
+
           
           arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
           
@@ -437,13 +440,7 @@ try({
           left_join(all_dat)
         
         dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
-        current_date <-
-          paste0("historic/",
-                 as.character(new_ds),
-                 "/",
-                 "last_",
-                 tf,
-                 "_days")
+
         
         arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
         
