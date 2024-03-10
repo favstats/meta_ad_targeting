@@ -61,7 +61,15 @@ try({
     sets$cntry <-  cntryy
     print(sets$cntry)
     
-    if(!exists("rate_limit")|length(rate_limit)==0) rate_limit <<- F
+    if(!exists("rate_limit")){
+      rate_limit <<- F
+    } else {
+      
+      if(length(rate_limit)==0)  rate_limit <<- F
+      
+    }
+    
+    
     
     if(rate_limit){
       break
@@ -92,7 +100,7 @@ try({
         unlist() %>%
         keep( ~ str_detect(.x, tf)) %>%
         # .[100:120] %>%
-        map_dfr_progress( ~ {
+        map_dfr( ~ {
           the_assets <-
             httr::GET(
               paste0(
@@ -244,7 +252,7 @@ try({
         unlist() %>%
         .[str_detect(., "last_90_days")] %>%
         # .[100:120] %>%
-        map_dfr_progress( ~ {
+        map_dfr( ~ {
           the_assets <-
             httr::GET(
               paste0(
@@ -404,7 +412,7 @@ try({
           filter(!(page_id %in% latest_elex$page_id))  %>%
           filter(page_id %in% last7$page_id) %>%
           split(1:nrow(.)) %>%
-          map_dfr_progress(scraper)
+          map_dfr(scraper)
         
         if (nrow(enddat) == 0) {
           election_dat <- latest_elex
@@ -442,7 +450,7 @@ try({
           arrange(page_id) %>%
           # slice(1:50) %>%
           split(1:nrow(.)) %>%
-          map_dfr_progress(scraper)  %>%
+          map_dfr(scraper)  %>%
           mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) %>%
           rename(page_id = internal_id)  %>%
           left_join(all_dat)
