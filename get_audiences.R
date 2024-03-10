@@ -61,7 +61,7 @@ try({
     sets$cntry <-  cntryy
     print(sets$cntry)
     
-    if(!exists("rate_limit")) rate_limit <<- F
+    if(!exists("rate_limit")|length(rate_limit)==0) rate_limit <<- F
     
     if(rate_limit){
       break
@@ -92,7 +92,7 @@ try({
         unlist() %>%
         keep( ~ str_detect(.x, tf)) %>%
         # .[100:120] %>%
-        map_dfr( ~ {
+        map_dfr_progress( ~ {
           the_assets <-
             httr::GET(
               paste0(
@@ -244,7 +244,7 @@ try({
         unlist() %>%
         .[str_detect(., "last_90_days")] %>%
         # .[100:120] %>%
-        map_dfr( ~ {
+        map_dfr_progress( ~ {
           the_assets <-
             httr::GET(
               paste0(
@@ -404,10 +404,16 @@ try({
           filter(!(page_id %in% latest_elex$page_id))  %>%
           filter(page_id %in% last7$page_id) %>%
           split(1:nrow(.)) %>%
-          map_dfr(scraper)
+          map_dfr_progress(scraper)
         
         if (nrow(enddat) == 0) {
           election_dat <- latest_elex
+          
+          dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
+          
+          
+          arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
+          
         } else {
           print(glue::glue("New DS: {new_ds}: Old DS: {latest_ds} 2"))
           
@@ -436,7 +442,7 @@ try({
           arrange(page_id) %>%
           # slice(1:50) %>%
           split(1:nrow(.)) %>%
-          map_dfr(scraper)  %>%
+          map_dfr_progress(scraper)  %>%
           mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) %>%
           rename(page_id = internal_id)  %>%
           left_join(all_dat)
@@ -474,7 +480,7 @@ try({
       filter(iso2c == sets$cntry) %>%
       pull(country)
     
-    if(!(the_tag %in% releases$release_names)){
+    if(!(the_tag %in% releases$tag_name)){
     try({
       pb_release_create_fr(
         repo = "favstats/meta_ad_targeting",
@@ -493,6 +499,7 @@ try({
               paste0(the_date, ".parquet"),
               overwrite = T)
     
+    print(file.exists(paste0(the_date, ".parquet")))
     
     print("################ UPLOAD FILE ################")
     
