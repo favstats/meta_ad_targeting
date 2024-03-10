@@ -524,10 +524,9 @@ try({
       )
       # pb_upload_file_fr(paste0(the_date, ".zip"), repo = "favstats/meta_ad_reports", tag = the_tag, releases = full_repos)
       
-      
     })
     
-    print("################ UPLOADED FILE ################")
+    print(paste0("################ UPLOADED FILE ################: ", sets$cntry))
     
     file.remove(paste0(the_date, ".parquet"))
     
