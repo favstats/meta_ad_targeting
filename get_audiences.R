@@ -1,6 +1,6 @@
 # Get command-line arguments
 # tf <- commandArgs(trailingOnly = TRUE)
-rate_limit <- F
+rate_limit <<- F
 try({
   
   outcome <- commandArgs(trailingOnly = TRUE)
@@ -33,7 +33,8 @@ try({
   
   eu_countries <- c("AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", 
                     "FR", "GR", "HR", "HU", "IE", "IT", "LT", "LU", "LV", "MT", 
-                    "NL", "PL", "PT", "RO", "SE", "SI", "SK")
+                    "NL", "PL", "PT", "RO", "SE", "SI", "SK", "US", "MX", "NZ", 
+                    "CA", "AU")
   
   full_cntry_list <-
     read_rds("https://github.com/favstats/meta_ad_reports/raw/main/cntry_list.rds") %>%
