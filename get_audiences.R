@@ -475,8 +475,8 @@ try({
       filter(iso2c == sets$cntry) %>%
       pull(country)
     
-    # try({
     if(!(the_tag %in% releases$release_names)){
+    try({
       pb_release_create_fr(
         repo = "favstats/meta_ad_targeting",
         tag = the_tag,
@@ -486,9 +486,9 @@ try({
         ),
         releases = releases
       )    # Sys.sleep(5)
+    })
     }
     
-    # })
     
     file.copy(paste0(current_date, ".parquet"),
               paste0(the_date, ".parquet"),
