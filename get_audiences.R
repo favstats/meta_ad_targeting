@@ -1,6 +1,6 @@
 # Get command-line arguments
 # tf <- commandArgs(trailingOnly = TRUE)
-rate_limit <<- F
+# rate_limit <<- F
 try({
   
   outcome <- commandArgs(trailingOnly = TRUE)
@@ -60,6 +60,8 @@ try({
   for (cntryy in full_cntry_list$iso2c) {
     sets$cntry <-  cntryy
     print(sets$cntry)
+    
+    if(!exists("rate_limit")) rate_limit <<- F
     
     if(rate_limit){
       break
