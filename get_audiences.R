@@ -509,25 +509,32 @@ try({
     
     print(file.exists(paste0(the_date, ".parquet")))
     
-    print("################ UPLOAD FILE ################")
-    
-    try({
-      # print(paste0(the_date, ".rds"))
-      # print(the_tag)
-      # debugonce(pb_upload_file_fr)
-      # debugonce(pb_upload_file_fr)
-      pb_upload_file_fr(
-        paste0(the_date, ".parquet"),
-        repo = "favstats/meta_ad_targeting",
-        tag = the_tag,
-        releases = releases
-      )
-      # pb_upload_file_fr(paste0(the_date, ".zip"), repo = "favstats/meta_ad_reports", tag = the_tag, releases = full_repos)
+    if(!(identical(latest_elex, election_dat))){
       
-    })
-    
-    print(paste0("################ UPLOADED FILE ################: ", sets$cntry))
-    
+      print("################ UPLOAD FILE ################")
+      
+      try({
+        # print(paste0(the_date, ".rds"))
+        # print(the_tag)
+        # debugonce(pb_upload_file_fr)
+        # debugonce(pb_upload_file_fr)
+        pb_upload_file_fr(
+          paste0(the_date, ".parquet"),
+          repo = "favstats/meta_ad_targeting",
+          tag = the_tag,
+          releases = releases
+        )
+        # pb_upload_file_fr(paste0(the_date, ".zip"), repo = "favstats/meta_ad_reports", tag = the_tag, releases = full_repos)
+        
+      })
+      
+      print(paste0("################ UPLOADED FILE ################: ", sets$cntry))
+      
+      
+    } else {
+      print("File is identical, will not be uploaded")
+    }
+
     file.remove(paste0(the_date, ".parquet"))
     
     
