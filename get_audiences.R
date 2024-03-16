@@ -20,6 +20,7 @@ try({
   # debugonce(get_targeting)
   
   library(httr)
+  library(httr2)
   library(tidyverse)
   library(lubridate)
   library(rvest)
@@ -42,7 +43,7 @@ try({
            country = cntry) %>%
     sample_n(n()) %>% 
     mutate(iso2c = fct_relevel(iso2c, eu_countries)) %>% 
-    arrange(iso2c)
+    arrange(iso2c) 
     # filter(iso2c %in% c("MT", "NP", "AM", "FR", "XK"))
   # slice(1:5)
   
@@ -60,7 +61,7 @@ try({
   # for (cntryy in full_cntry_list$iso2c) {
   #   sets$cntry <-  cntryy
   #   print(sets$cntry)
-  #   
+  # #   
   #   if(!exists("rate_limit")){
   #     rate_limit <<- F
   #   } else {
@@ -77,6 +78,7 @@ try({
     
     unlink("targeting", recursive = T, force = T)
     unlink("historic", recursive = T, force = T)
+    unlink("info", recursive = T, force = T)
     
     # if()
     
@@ -344,17 +346,32 @@ try({
     
     saveRDS(all_dat, "data/all_dat.rds")
     
+    # all_dat <- readRDS("data/all_dat.rds")
+    
     # source("cntry.R")
     
     # all_dat %>% filter(page_id == "492150400807824")
     
     
     
-    scraper <- function(.x, time = tf) {
+    scraper <- function(.x, time = tf, cntry = "US") {
       # print(paste0(.x$page_name,": ", round(which(internal_page_ids$page_id == .x$page_id)/nrow(internal_page_ids)*100, 2)))
+      # .x <- list()
+      # .x$page_id <- "7860876103"
+      # time <- "90"
+      # get_targeting(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS"))
+        
+      if(nrow(.x)==0) return(tibble(targeting_info = NULL, page_info = NULL))
       
-      fin <-
-        get_targeting(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS")) %>%
+      raw_resp <- get_page_insights(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS"), iso2c = sets$cntry, join_info = F) 
+      
+      fin <- raw_resp %>%
+        .[[2]] %>% 
+        mutate(tstamp = tstamp) %>% 
+        rename(internal_id = page_id)
+      
+      fin2 <- raw_resp %>%
+        .[[1]] %>% 
         mutate(tstamp = tstamp)
       
       if (nrow(fin) != 0) {
@@ -377,9 +394,31 @@ try({
           mutate(tstamp = tstamp)
       }
       
+      if (nrow(fin2) != 0) {
+        if (!dir.exists(glue::glue("info"))) {
+          dir.create(glue::glue("info"), recursive = T)
+        }
+        
+        path <-
+          paste0(glue::glue("info/"), .x$page_id, ".rds")
+        # if(file.exists(path)){
+        #   ol <- read_rds(path)
+        #
+        #   saveRDS(fin %>% bind_rows(ol), file = path)
+        # } else {
+        
+        saveRDS(fin2, file = path)
+        # }
+      } else {
+        fin2 <- tibble(internal_id = .x$page_id, no_data = T) %>%
+          mutate(tstamp = tstamp) 
+      }
+      
+      
+      c("page_info", "targeting_info")
       # print(nrow(fin))
       # })
-      return(fin)
+      return(list(page_info = fin2, targeting_info = fin))
       
     }
     
@@ -387,6 +426,12 @@ try({
     
     
     print("################ RETRIEVE AUDIENCES ################")
+    try({
+      old_info <- arrow::read_parquet(glue::glue("https://github.com/favstats/meta_ad_targeting/releases/download/PageInfo/{sets$cntry}-page_info.parquet"))
+    })
+    if(!exists("old_info")){
+      old_info <- tibble()
+    }
     # if(F){
     #     # dir("provincies/7", full.names
     # }
@@ -402,19 +447,27 @@ try({
                tf,
                "_days")
       
+      # all_dat <- all_dat %>% slice(1)
+      
       if (new_ds == latest_ds) {
+        ### if we are still in the same period
         print(glue::glue("New DS: {new_ds}: Old DS: {latest_ds}"))
+        # debugonce(get_page_insights)
         
         ### save seperately
-        enddat <- all_dat %>%
+        benny <- all_dat %>%
           arrange(page_id) %>%
-          # slice(1:150) %>%
+          # slice(1:10) %>%
           filter(!(page_id %in% latest_elex$page_id))  %>%
           filter(page_id %in% last7$page_id) %>%
           split(1:nrow(.)) %>%
-          map_dfr(scraper)
+          map(scraper)
+        
+        enddat <- benny %>% map_dfr(~pluck(.x, "targeting_info")) %>% as_tibble()
+        
         
         if (nrow(enddat) == 0) {
+          ## no new data
           election_dat <- latest_elex
           
           dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
@@ -422,7 +475,9 @@ try({
           
           arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
           
+          
         } else {
+          ## new data so we need to bind it
           print(glue::glue("New DS: {new_ds}: Old DS: {latest_ds} 2"))
           
           
@@ -437,7 +492,7 @@ try({
 
           
           arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
-          
+
           # arrow::read_parquet(paste0(current_date, ".parquet")) %>% View()
           
           # saveRDS(election_dat, file = paste0(current_date, ".rds"))
@@ -445,12 +500,19 @@ try({
         
         
       } else {
+        
         ### save seperately
-        election_dat <- all_dat %>%
+        benny <- all_dat %>%
           arrange(page_id) %>%
-          # slice(1:50) %>%
           split(1:nrow(.)) %>%
-          map_dfr(scraper)  %>%
+          map(scraper)
+        
+        enddat <- benny %>% map_dfr(~pluck(.x, "targeting_info")) %>% as_tibble()
+        
+        # infodat <- benny %>% map_dfr(~pluck(.x, "page_info")) %>% as_tibble()
+        
+        
+        election_dat <- enddat %>%
           mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) %>%
           rename(page_id = internal_id)  %>%
           left_join(all_dat)
@@ -460,7 +522,7 @@ try({
         
         arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
         
-        
+        # arrow::write_parquet(infodat, paste0(sets$cntry,"-page_info", ".parquet"))
       }
     })
     # saveRDS(election_dat, paste0("data/election_dat", tf, ".rds"))
@@ -477,11 +539,37 @@ try({
     # full_repos
     
     # cntry_name
+    ### save seperately
+    # benny <- all_dat %>%
+    #   arrange(page_id) %>%
+    #   sample_n(30) %>%
+    #   split(1:nrow(.)) %>%
+    #   map_progress(scraper)
     
+    # print(unique(all_dat$cntry))
+    # glimpse(all_dat)
+    
+    # glimpse(old_info)
+    infodat <- benny %>% map_dfr(~pluck(.x, "page_info")) %>% as_tibble()
+    
+    
+    try({
+      infodat <- infodat %>% 
+        bind_rows(old_info) %>% 
+        distinct(page_name, about, likes, .keep_all = T)      
+    })
+
+    
+    # infodat %>% View()
+    # glimpse(infodat)
+    
+    ### TODO: get previous info
+    arrow::write_parquet(infodat, paste0(sets$cntry,"-page_info", ".parquet"))
     # reeeleases <- get_full_release()
     # releeasee <- get_full_release()
-    
-    # saveRDS(releeasee %>% drop_na(), file = "data/releeasee.rds")
+    # releasess <- get_full_release()
+    # releasesss <- piggyback::pb_releases()
+    # saveRDS(releasesss, file = "data/releases.rds")
     releases <- readRDS("data/releases.rds")
     
     cntry_name <- full_cntry_list %>%
@@ -511,7 +599,7 @@ try({
     
     if(!(identical(latest_elex, election_dat))){
       
-      print("################ UPLOAD FILE ################")
+      print("################ UPLOAD TARGETING FILE ################")
       
       try({
         # print(paste0(the_date, ".rds"))
@@ -524,19 +612,50 @@ try({
           tag = the_tag,
           releases = releases
         )
+        
         # pb_upload_file_fr(paste0(the_date, ".zip"), repo = "favstats/meta_ad_reports", tag = the_tag, releases = full_repos)
         
       })
       
-      print(paste0("################ UPLOADED FILE ################: ", sets$cntry))
+      print(paste0("################ UPLOADED TARGETING FILE ################: ", sets$cntry))
       
       
     } else {
-      print("File is identical, will not be uploaded")
+      print("Targeting File is identical, will not be uploaded")
+    }
+    
+    if(nrow(infodat)!=0){
+      if(!(identical(old_info, infodat))){
+        
+        print("################ UPLOAD INFO FILE ################")
+        
+        try({
+          
+          # debugonce(pb_upload_file_fr)
+          pb_upload_file_fr(
+            paste0(sets$cntry,"-page_info", ".parquet"),
+            repo = "favstats/meta_ad_targeting",
+            tag = "PageInfo",
+            releases = releases
+          )
+          # pb_upload_file_fr(paste0(the_date, ".zip"), repo = "favstats/meta_ad_reports", tag = the_tag, releases = full_repos)
+          
+        })
+        
+        print(paste0("################ UPLOADED INFO FILE ################: ", sets$cntry))
+        
+        
+      } else {
+        print("Info File is identical, will not be uploaded")
+      }      
     }
 
-    file.remove(paste0(the_date, ".parquet"))
     
+    
+
+    file.remove(paste0(the_date, ".parquet"))
+    file.remove(paste0(sets$cntry,"-page_info", ".parquet"))
+    rm(old_info)
     
     gc()
     
@@ -555,6 +674,7 @@ try({
     
     unlink("targeting", recursive = T, force = T)
     unlink("historic", recursive = T, force = T)
+    unlink("info", recursive = T, force = T)
     
     print("################ FIN ################")
     
@@ -568,3 +688,7 @@ try({
 
 
 print("################ VERY END ################")
+
+# arrow::read_parquet("https://github.com/favstats/meta_ad_targeting/releases/download/PageInfo/DK-page_info.parquet")
+# 
+# arrow::read_parquet("https://github.com/favstats/meta_ad_targeting/releases/download/PageInfo/FI-page_info.parquet") %>% View()

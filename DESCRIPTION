@@ -38,7 +38,8 @@ Imports:
 		DT,
 		piggyback,
 		prettydoc,
-		arrow
+		arrow,
+		httr2
 Depends:
     R (>= 3.0.0)
 RoxygenNote: 5.0.1
