@@ -58,23 +58,26 @@ try({
     
   }
   
+  # loop_it <- T
+  targeting <- F
+  # if(loop_it){
+  #   
+  # }
+  
   # for (cntryy in full_cntry_list$iso2c) {
   #   sets$cntry <-  cntryy
   #   print(sets$cntry)
-  # #   
+  # #
   #   if(!exists("rate_limit")){
   #     rate_limit <<- F
   #   } else {
-  #     
+  # 
   #     if(length(rate_limit)==0)  rate_limit <<- F
-  #     
+  # 
   #   }
-    
-    
-    
-    # if(rate_limit){
-    #   break
-    # }
+  #   if(rate_limit){
+  #     break
+  #   }
     
     unlink("targeting", recursive = T, force = T)
     unlink("historic", recursive = T, force = T)
@@ -448,82 +451,95 @@ try({
                "_days")
       
       # all_dat <- all_dat %>% slice(1)
-      
-      if (new_ds == latest_ds) {
-        ### if we are still in the same period
-        print(glue::glue("New DS: {new_ds}: Old DS: {latest_ds}"))
-        # debugonce(get_page_insights)
+      # targeting <- T
+      if(targeting){
         
-        ### save seperately
-        benny <- all_dat %>%
-          arrange(page_id) %>%
-          # slice(1:10) %>%
-          filter(!(page_id %in% latest_elex$page_id))  %>%
-          filter(page_id %in% last7$page_id) %>%
-          split(1:nrow(.)) %>%
-          map(scraper)
-        
-        enddat <- benny %>% map_dfr(~pluck(.x, "targeting_info")) %>% as_tibble()
-        
-        
-        if (nrow(enddat) == 0) {
-          ## no new data
-          election_dat <- latest_elex
+        if (new_ds == latest_ds) {
+          ### if we are still in the same period
+          print(glue::glue("New DS: {new_ds}: Old DS: {latest_ds}"))
+          # debugonce(get_page_insights)
           
-          dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
+          ### save seperately
+          benny <- all_dat %>%
+            arrange(page_id) %>%
+            # slice(1:10) %>%
+            filter(!(page_id %in% latest_elex$page_id))  %>%
+            filter(page_id %in% last7$page_id) %>%
+            split(1:nrow(.)) %>%
+            map(scraper)
+          
+          enddat <- benny %>% map_dfr(~pluck(.x, "targeting_info")) %>% as_tibble()
           
           
-          arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
+          if (nrow(enddat) == 0) {
+            ## no new data
+            election_dat <- latest_elex
+            
+            dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
+            
+            
+            arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
+            
+            
+          } else {
+            ## new data so we need to bind it
+            print(glue::glue("New DS: {new_ds}: Old DS: {latest_ds} 2"))
+            
+            
+            election_dat  <- enddat %>%
+              mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) %>%
+              rename(page_id = internal_id) %>%
+              left_join(all_dat) %>%
+              bind_rows(latest_elex) %>%
+              distinct()
+            
+            dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
+            
+            
+            arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
+            
+            # arrow::read_parquet(paste0(current_date, ".parquet")) %>% View()
+            
+            # saveRDS(election_dat, file = paste0(current_date, ".rds"))
+          }
           
           
         } else {
-          ## new data so we need to bind it
-          print(glue::glue("New DS: {new_ds}: Old DS: {latest_ds} 2"))
+          
+          ### save seperately
+          benny <- all_dat %>%
+            arrange(page_id) %>%
+            split(1:nrow(.)) %>%
+            map(scraper)
+          
+          enddat <- benny %>% map_dfr(~pluck(.x, "targeting_info")) %>% as_tibble()
+          
+          # infodat <- benny %>% map_dfr(~pluck(.x, "page_info")) %>% as_tibble()
           
           
-          election_dat  <- enddat %>%
+          election_dat <- enddat %>%
             mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) %>%
-            rename(page_id = internal_id) %>%
-            left_join(all_dat) %>%
-            bind_rows(latest_elex) %>%
-            distinct()
+            rename(page_id = internal_id)  %>%
+            left_join(all_dat)
           
           dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
-
+          
           
           arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
-
-          # arrow::read_parquet(paste0(current_date, ".parquet")) %>% View()
           
-          # saveRDS(election_dat, file = paste0(current_date, ".rds"))
+          # arrow::write_parquet(infodat, paste0(sets$cntry,"-page_info", ".parquet"))
         }
         
-        
       } else {
-        
+        # cntry_name
         ### save seperately
         benny <- all_dat %>%
           arrange(page_id) %>%
+          # sample_n(30) %>%
           split(1:nrow(.)) %>%
-          map(scraper)
-        
-        enddat <- benny %>% map_dfr(~pluck(.x, "targeting_info")) %>% as_tibble()
-        
-        # infodat <- benny %>% map_dfr(~pluck(.x, "page_info")) %>% as_tibble()
-        
-        
-        election_dat <- enddat %>%
-          mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) %>%
-          rename(page_id = internal_id)  %>%
-          left_join(all_dat)
-        
-        dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
-
-        
-        arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
-        
-        # arrow::write_parquet(infodat, paste0(sets$cntry,"-page_info", ".parquet"))
+          map_progress(scraper)
       }
+ 
     })
     # saveRDS(election_dat, paste0("data/election_dat", tf, ".rds"))
     
@@ -538,13 +554,7 @@ try({
     
     # full_repos
     
-    # cntry_name
-    ### save seperately
-    # benny <- all_dat %>%
-    #   arrange(page_id) %>%
-    #   sample_n(30) %>%
-    #   split(1:nrow(.)) %>%
-    #   map_progress(scraper)
+
     
     # print(unique(all_dat$cntry))
     # glimpse(all_dat)
@@ -610,7 +620,7 @@ try({
           paste0(the_date, ".parquet"),
           repo = "favstats/meta_ad_targeting",
           tag = the_tag,
-          releases = releases
+          releases = releases, skip  = T
         )
         
         # pb_upload_file_fr(paste0(the_date, ".zip"), repo = "favstats/meta_ad_reports", tag = the_tag, releases = full_repos)
@@ -659,6 +669,8 @@ try({
     
     gc()
     
+    
+    ### END FOR LOOP
     # }
     # # .[1:7] %>%
     # walk_progress( ~ {
