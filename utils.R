@@ -475,7 +475,7 @@ delete_asset_by_filename <- function(owner, repo, release_id, filename, .token  
 
 
 
-pb_upload_file_fr <- function (file, repo, tag, .token = gh::gh_token(), releases, dir = NULL) {
+pb_upload_file_fr <- function (file, repo, tag, .token = gh::gh_token(), releases, dir = NULL, skip  = F) {
   # Construct the file path
   file_path <- do.call(file.path, compact(list(dir, file)))
   
@@ -508,10 +508,10 @@ pb_upload_file_fr <- function (file, repo, tag, .token = gh::gh_token(), release
     
     df <- releases[releases$tag == tag,]
     
-    # if(basename(file_path) %in% c("latest.rds", "full_repos.rds")){
+    if(!skip){
       
       delete_asset_by_filename(owner = r[1], repo = r[2], release_id = df$release_id, filename = file_path)
-    
+      
       # df <- piggyback:::pb_info(repo = repo, tag = tag, .token = .token)
       # i <- which(stringr::str_detect(dfs$file_name, str_remove(file_path, ".parquet")))
       # if (length(i) > 0) {
@@ -541,14 +541,18 @@ pb_upload_file_fr <- function (file, repo, tag, .token = gh::gh_token(), release
         body = httr::upload_file(file_path)
       )
       
-    # } else {
-    #   print("already there so we skip")
-    # }
+      # } else {
+      #   print("already there so we skip")
+      # }
+      
+      httr::warn_for_status(rsd)
+      # invisible(rsd)
+      
+      return(NULL)
+      
+    }
     
-    httr::warn_for_status(rsd)
-    # invisible(rsd)
-    
-    return(NULL)
+
     
     
   }
