@@ -78,5 +78,11 @@ jobs:
             any::piggyback
             any::arrow
             any::httr2
+      - name: Homebrew update
+        run: brew update
+      - name: Install needed packages via Homebrew
+        run: |
+          brew install openssl
+          brew install apache-arrow
       - name: "Script - Meta Run for ${{ matrix.iso-code }}"
         run: Rscript 'get_audiences.R' "90" "${{ matrix.iso-code }}"
