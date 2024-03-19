@@ -78,14 +78,5 @@ jobs:
             any::piggyback
             any::arrow
             any::httr2
-      - name: Homebrew update
-        run: brew update
-      - name: Install needed packages via Homebrew
-        run: |
-          brew install openssl
-          brew install curl
-          brew install libxml2
-          brew install harfbuzz
-          brew install fribidi
       - name: "Script - Meta Run for ${{ matrix.iso-code }}"
         run: Rscript 'get_audiences.R' "30" "${{ matrix.iso-code }}"
