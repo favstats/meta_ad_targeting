@@ -78,16 +78,14 @@ jobs:
             any::piggyback
             any::arrow
             any::httr2
-      - name: Apt-get update things
+      - name: Homebrew update
+        run: brew update
+      - name: Install needed packages via Homebrew
         run: |
-          sudo apt-get update 
-      - name: Apt-get needed things
-        run: |
-          sudo apt-get install --no-install-recommends -y \
-          libssl-dev \
-          libcurl4-openssl-dev \
-          libxml2-dev \
-          libharfbuzz-dev \
-          libfribidi-dev
+          brew install openssl
+          brew install curl
+          brew install libxml2
+          brew install harfbuzz
+          brew install fribidi
       - name: "Script - Meta Run for ${{ matrix.iso-code }}"
         run: Rscript 'get_audiences.R' "7" "${{ matrix.iso-code }}" 
