@@ -454,6 +454,8 @@ delete_asset_by_filename <- function(owner, repo, release_id, filename, .token  
   # Find the asset by filename
   asset <- purrr::keep(assets, ~ .x$name == filename)
   
+  print(glimpse(asset))
+  
   # Check if the asset was found
   if (length(asset) == 1) {
     # Extract the asset ID
@@ -473,6 +475,12 @@ delete_asset_by_filename <- function(owner, repo, release_id, filename, .token  
 # Note: Replace 'owner', 'repo', 'release_id', 'filename', and '.token' with actual values
 # delete_asset_by_filename(owner = "your_username", repo = "your_repo", release_id = "your_release_id", filename = "your_filename", .token = "your_token")
 
+# df <- releases[releases$tag == "DE-last_90_days",]
+# 
+# assets <- gh::gh("GET /repos/:owner/:repo/releases/:release_id/assets",
+#                  owner = "favstats", repo = "meta_ad_targeting", release_id = df$release_id)
+# 
+# asset <- purrr::keep(assets, ~ .x$name == "2024-03-16.parquet")
 
 
 pb_upload_file_fr <- function (file, repo, tag, .token = gh::gh_token(), releases, dir = NULL, skip  = F) {
