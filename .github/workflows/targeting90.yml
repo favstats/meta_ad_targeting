@@ -9,7 +9,7 @@ on:
 jobs:
   update-meta-targeting:
     name: Update Meta Targeting
-    runs-on: macos-latest
+    runs-on: windows-latest
     strategy:
       matrix:
         iso-code: ["AD", "AE", "AG", "AI", "AL", "AM", "AO", "AR", "AT", "AU", 
@@ -78,10 +78,5 @@ jobs:
             any::piggyback
             any::arrow
             any::httr2
-      - name: Homebrew update
-        run: brew update
-      - name: Install needed packages via Homebrew
-        run: |
-          brew install apache-arrow
       - name: "Script - Meta Run for ${{ matrix.iso-code }}"
         run: Rscript 'get_audiences.R' "90" "${{ matrix.iso-code }}"
