@@ -337,13 +337,14 @@ try({
     filter(!remove_em) %>%
     # filter(n >= 2) %>%
     # filter(n >= 2 & str_ends(page_id, "0", negate = T)) %>%
-    select(-n,-contains("no_data"))
-  
+    select(-n,-contains("no_data"))  %>% 
+    mutate(total_n = n())
   
   # all_dat %>% filter(str_detect(page_name, "GroenLinks-PvdA"))
   
   saveRDS(all_dat, "data/all_dat.rds")
   
+  scrape_dat <- all_dat
   # source("cntry.R")
   
   # all_dat %>% filter(page_id == "492150400807824")
@@ -351,7 +352,13 @@ try({
   
   
   scraper <- function(.x, time = tf) {
-    # print(paste0(.x$page_name,": ", round(which(internal_page_ids$page_id == .x$page_id)/nrow(internal_page_ids)*100, 2)))
+    
+    if((which(scrape_dat$page_id == .x$page_id) %% round(nrow(scrape_dat)/4, -1)) == 0){
+      
+      print(paste0(.x$page_name,": ", round(which(scrape_dat$page_id == .x$page_id)/nrow(scrape_dat)*100, 2)))
+      
+    }
+   
     
     fin <-
       get_targeting(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS")) %>%
@@ -405,22 +412,23 @@ try({
     if (new_ds == latest_ds) {
       print(glue::glue("New DS: {new_ds}: Old DS: {latest_ds}"))
       
-      remainers <- all_dat %>%
+      scrape_dat <- all_dat %>%
         arrange(page_id) %>%
         # slice(1:150) %>%
         filter(!(page_id %in% latest_elex$page_id))  %>%
-        filter(page_id %in% last7$page_id)
+        filter(page_id %in% last7$page_id) %>% 
+        mutate(total_n = n())
       
-      print(paste0("Number of remaining pages to check: ", nrow(remainers)))
+      print(paste0("Number of remaining pages to check: ", nrow(scrape_dat)))
       
       ### save seperately
-      enddat <-  remainers %>%
+      enddat <-  scrape_dat %>%
         split(1:nrow(.)) %>%
         map_dfr(scraper)
       
       if (nrow(enddat) == 0) {
         
-        print("same length")
+        print("same length! will just save the same parquet!")
         
         election_dat <- latest_elex
         
@@ -457,6 +465,7 @@ try({
       
       print(glue::glue("Complete new Data. New DS: {new_ds}: Old DS: {latest_ds} 2"))
       
+      print(paste0("Number of pages to check: ", nrow(scrape_dat)))
       ### save seperately
       election_dat <- all_dat %>%
         arrange(page_id) %>%
