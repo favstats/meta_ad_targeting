@@ -51,7 +51,7 @@ try({
   if (Sys.info()[["sysname"]] == "Windows") {
     ### CHANGE ME WHEN LOCAL!
     tf <- "30"
-    sets$cntry <- "LU"
+    sets$cntry <- "AT"
     print(paste0("TF: ", tf))
     print(paste0("cntry: ", sets))
     
@@ -405,16 +405,23 @@ try({
     if (new_ds == latest_ds) {
       print(glue::glue("New DS: {new_ds}: Old DS: {latest_ds}"))
       
-      ### save seperately
-      enddat <- all_dat %>%
+      remainers <- all_dat %>%
         arrange(page_id) %>%
         # slice(1:150) %>%
         filter(!(page_id %in% latest_elex$page_id))  %>%
-        filter(page_id %in% last7$page_id) %>%
+        filter(page_id %in% last7$page_id)
+      
+      print(paste0("Number of remaining pages to check: ", nrow(remainers)))
+      
+      ### save seperately
+      enddat <-  remainers %>%
         split(1:nrow(.)) %>%
         map_dfr(scraper)
       
       if (nrow(enddat) == 0) {
+        
+        print("same length")
+        
         election_dat <- latest_elex
         
         dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
@@ -423,14 +430,16 @@ try({
         arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
         
       } else {
-        print(glue::glue("New DS: {new_ds}: Old DS: {latest_ds} 2"))
+        
+        print("new data to be uploaded")
+        
         
         
         election_dat  <- enddat %>%
           mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) %>%
           rename(page_id = internal_id) %>%
           left_join(all_dat) %>%
-          bind_rows(latest_elex) %>%
+          bind_rows(latest_elex %>% filter(!(page_id %in% enddat$page_id))) %>%
           distinct()
         
         dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
@@ -445,6 +454,9 @@ try({
       
       
     } else {
+      
+      print(glue::glue("Complete new Data. New DS: {new_ds}: Old DS: {latest_ds} 2"))
+      
       ### save seperately
       election_dat <- all_dat %>%
         arrange(page_id) %>%
@@ -516,7 +528,6 @@ try({
     try({
       # print(paste0(the_date, ".rds"))
       # print(the_tag)
-      # debugonce(pb_upload_file_fr)
       # debugonce(pb_upload_file_fr)
       pb_upload_file_fr(
         paste0(the_date, ".parquet"),
