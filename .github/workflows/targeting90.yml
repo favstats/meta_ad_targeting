@@ -1,7 +1,7 @@
 name: "Meta Targeting 90"
 on:
   schedule:
-    - cron: '0 3,7,12,13,16,19,22 * * *'
+    - cron: '0 3,7,13,16,19,22 * * *'
   push:
     branches:
       - main
