@@ -467,7 +467,7 @@ try({
         benny <- all_dat %>%
           arrange(page_id) %>%
           # slice(1:10) %>%
-          filter(!(page_id %in% latest_elex$page_id))  %>%
+          # filter(!(page_id %in% latest_elex$page_id))  %>%
           filter(page_id %in% last7$page_id) %>%
           split(1:nrow(.)) %>%
           map(scraper)
