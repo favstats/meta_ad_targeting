@@ -1,14 +1,14 @@
-name: "Meta Targeting 30"
+name: "Meta Info 30"
 on:
   schedule:
-    - cron: '0 1,4,9,12,15,18,21 * * *'
+    - cron: '0 2,11,23 * * *'
   push:
     branches:
       - main
       
 jobs:
-  update-meta-targeting:
-    name: Update Meta Targeting
+  update-meta-info:
+    name: Update Meta Info
     runs-on: windows-latest
     strategy:
       matrix:
