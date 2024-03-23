@@ -79,4 +79,4 @@ jobs:
             any::arrow
             any::httr2
       - name: "Script - Meta Run for ${{ matrix.iso-code }}"
-        run: Rscript 'get_audiences.R' "30" "${{ matrix.iso-code }}"
+        run: Rscript 'get_audiences_info.R' "30" "${{ matrix.iso-code }}"
