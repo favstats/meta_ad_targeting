@@ -25,7 +25,12 @@ try({
   library(rvest)
   library(piggyback)
   
+  Sys.setenv(LIBARROW_MINIMAL = "false")
+  Sys.setenv(NOT_CRAN = "true")
+  install.packages("arrow")
+  
   arrow::install_arrow(verbose = TRUE) # verbose output to debug install errors
+  arrow::arrow_info()
   
   # sets <- jsonlite::fromJSON("settings.json")
   #
