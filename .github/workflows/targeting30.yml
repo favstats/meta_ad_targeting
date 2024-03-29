@@ -42,6 +42,9 @@ jobs:
           r-version: 'release'
       - name: Setup - Checkout repo
         uses: actions/checkout@v3
+      - name: Install Arrow C++ libraries
+        run: |
+          brew install arrow
       - name: Install macOS packages
         run: |
           brew install pkg-config
