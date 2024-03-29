@@ -27,10 +27,13 @@ try({
   
   Sys.setenv(LIBARROW_MINIMAL = "false")
   Sys.setenv(NOT_CRAN = "true")
-  install.packages("arrow")
   
+  print("##### please install arrow #####")
+  
+  install.packages("arrow")
   arrow::install_arrow(verbose = TRUE) # verbose output to debug install errors
-  arrow::arrow_info()
+  print(arrow::arrow_info())
+  print("##### did you install arrow? #####")
   
   # sets <- jsonlite::fromJSON("settings.json")
   #
