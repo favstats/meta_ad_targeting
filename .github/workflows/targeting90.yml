@@ -9,7 +9,7 @@ on:
 jobs:
   update-meta-targeting:
     name: Update Meta Targeting
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         iso-code: ["AD", "AE", "AG", "AI", "AL", "AM", "AO", "AR", "AT", "AU", 
@@ -76,7 +76,17 @@ jobs:
             any::prettydoc
             any::DT
             any::piggyback
-            any::arrow
             any::httr2
+      - name: Apt-get update things
+        run: |
+          sudo apt-get update 
+      - name: Apt-get needed things
+        run: |
+          sudo apt-get install --no-install-recommends -y \
+          libssl-dev \
+          libcurl4-openssl-dev \
+          libxml2-dev \
+          libharfbuzz-dev \
+          libfribidi-dev
       - name: "Script - Meta Run for ${{ matrix.iso-code }}"
         run: Rscript 'get_audiences.R' "90" "${{ matrix.iso-code }}"

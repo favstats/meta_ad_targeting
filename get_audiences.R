@@ -35,6 +35,8 @@ try({
   print(arrow::arrow_info())
   print("##### did you install arrow? #####")
   
+  # pacman::p_load(arrow)
+  
   # sets <- jsonlite::fromJSON("settings.json")
   #
   # title_txt <- read_lines("_site/_quarto.yml")

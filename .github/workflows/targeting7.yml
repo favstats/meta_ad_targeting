@@ -76,7 +76,6 @@ jobs:
             any::prettydoc
             any::DT
             any::piggyback
-            any::arrow
             any::httr2
       - name: "Script - Meta Run for ${{ matrix.iso-code }}"
         run: Rscript 'get_audiences.R' "7" "${{ matrix.iso-code }}" 
