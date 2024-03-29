@@ -25,6 +25,8 @@ try({
   library(rvest)
   library(piggyback)
   
+  arrow::install_arrow(verbose = TRUE) # verbose output to debug install errors
+  
   # sets <- jsonlite::fromJSON("settings.json")
   #
   # title_txt <- read_lines("_site/_quarto.yml")
