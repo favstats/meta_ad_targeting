@@ -2,9 +2,6 @@ name: "Meta Targeting 7"
 on:
   schedule:
     - cron: '0 2,5,8,11,14,17,21 * * *'
-  push:
-    branches:
-      - main
       
 jobs:
   update-meta-targeting:
