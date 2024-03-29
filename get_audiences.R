@@ -3,6 +3,11 @@
 # rate_limit <<- F
 try({
   
+  if (Sys.info()[["effective_user"]] != "fabio") {
+    remove.packages("arrow")
+  }
+  
+  
   outcome <- commandArgs(trailingOnly = TRUE)
   
   sets <- list()
@@ -26,11 +31,20 @@ try({
   library(piggyback)
   
   Sys.setenv(LIBARROW_MINIMAL = "false")
-  Sys.setenv(NOT_CRAN = "true")
+  Sys.setenv("NOT_CRAN" = "true")
   
   print("##### please install arrow #####")
   
-  install.packages("arrow")
+  options(
+    HTTPUserAgent =
+      sprintf(
+        "R/%s R (%s)",
+        getRversion(),
+        paste(getRversion(), R.version["platform"], R.version["arch"], R.version["os"])
+      )
+  )
+  
+  install.packages("arrow", repos = "https://packagemanager.rstudio.com/all/__linux__/focal/latest")
   arrow::install_arrow(verbose = TRUE) # verbose output to debug install errors
   print(arrow::arrow_info())
   print("##### did you install arrow? #####")
