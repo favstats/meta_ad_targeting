@@ -451,6 +451,8 @@ delete_asset_by_filename <- function(owner, repo, release_id, filename, .token  
   assets <- gh::gh("GET /repos/:owner/:repo/releases/:release_id/assets",
                owner = owner, repo = repo, release_id = release_id, .token = .token)
   
+  print(assets)
+  
   # Find the asset by filename
   asset <- purrr::keep(assets, ~ .x$name == filename)
   
@@ -513,6 +515,7 @@ pb_upload_file_fr <- function (file, repo, tag, .token = gh::gh_token(), release
   
   if(!is.null(httr::content(rsd)$errors[[1]]$code)){
     # tag <- "EE-last_7_days"
+    print(httr::content(rsd)$errors[[1]])
     
     df <- releases[releases$tag == tag,]
     

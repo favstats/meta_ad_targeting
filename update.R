@@ -5,6 +5,10 @@ library(rvest)
 source("helpers.R")
 source("utils.R")
 
+sets <- list()
+sets$cntry <- "OO"
+
+# jsonlite::read_json("settings.json")
 
 full_cntry_list <-
   read_rds("https://github.com/favstats/meta_ad_reports/raw/main/cntry_list.rds") %>%
@@ -74,7 +78,7 @@ retrieve_em <- function(iso2c, date, tf = "30") {
     mutate(cntry = iso2c) %>% 
     arrow::write_parquet(glue::glue("{date}.parquet"))
   
-  
+  Sys.sleep(1)
   print(file.exists(glue::glue("{date}.parquet")))
   
   # if(!(identical(latest_elex, election_dat))){
@@ -92,7 +96,7 @@ retrieve_em <- function(iso2c, date, tf = "30") {
         glue::glue("{date}.parquet"),
         repo = "favstats/meta_ad_targeting",
         tag = the_tag,
-        releases = releases
+        releases = releases, skip = T
       )
       # pb_upload_file_fr(paste0(the_date, ".zip"), repo = "favstats/meta_ad_reports", tag = the_tag, releases = full_repos)
       
