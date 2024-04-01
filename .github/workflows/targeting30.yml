@@ -9,7 +9,7 @@ on:
 jobs:
   update-meta-targeting:
     name: Update Meta Targeting
-    runs-on: macos-latest
+    runs-on: windows-latest
     strategy:
       matrix:
         iso-code: ["AD", "AE", "AG", "AI", "AL", "AM", "AO", "AR", "AT", "AU", 
@@ -42,15 +42,6 @@ jobs:
           r-version: 'release'
       - name: Setup - Checkout repo
         uses: actions/checkout@v3
-      - name: Install Arrow C++ libraries
-        run: |
-          brew install apache-arrow
-      - name: Install macOS packages
-        run: |
-          brew install pkg-config
-          brew install gdal
-          brew install geos
-          brew install proj
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           cache-version: 1
