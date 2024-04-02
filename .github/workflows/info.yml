@@ -1,7 +1,7 @@
 name: "Meta Info 30"
 on:
   schedule:
-    - cron: '0 2,11,23 * * *'
+    - cron: '0 2 * * *'
       
 jobs:
   update-meta-info:
