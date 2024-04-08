@@ -83,16 +83,5 @@ jobs:
             any::DT
             any::piggyback
             any::httr2
-      - name: Apt-get update things
-        run: |
-          sudo apt-get update 
-      - name: Apt-get needed things
-        run: |
-          sudo apt-get install --no-install-recommends -y \
-          libssl-dev \
-          libcurl4-openssl-dev \
-          libxml2-dev \
-          libharfbuzz-dev \
-          libfribidi-dev
       - name: "Script - Meta Run for ${{ matrix.iso-code }}"
         run: Rscript 'get_audiences.R' "90" "${{ matrix.iso-code }}"
