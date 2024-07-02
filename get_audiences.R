@@ -46,9 +46,9 @@ try({
   )
   
   install.packages("arrow", repos = "https://packagemanager.rstudio.com/all/__linux__/focal/latest")
-  arrow::install_arrow(verbose = TRUE) # verbose output to debug install errors
-  print(arrow::arrow_info())
-  print("##### did you install arrow? #####")
+  arrow::install_arrow(verbose = F) # verbose output to debug install errors
+  # print(arrow::arrow_info())
+  # print("##### did you install arrow? #####")
   
   # pacman::p_load(arrow)
   
@@ -77,13 +77,14 @@ try({
   
   if (Sys.info()[["effective_user"]] == "fabio") {
     ### CHANGE ME WHEN LOCAL!
-    tf <- "90"
-    sets$cntry <- "AT"
+    tf <- "30"
+    sets$cntry <- "GB"
     print(paste0("TF: ", tf))
     print(paste0("cntry: ", sets))
     
   }
   
+
   # for (cntryy in full_cntry_list$iso2c) {
   #   sets$cntry <-  cntryy
   #   print(sets$cntry)
@@ -106,9 +107,9 @@ try({
   unlink("historic", recursive = T, force = T)
   
   # if()
-  
+  # library(stringr)
   jb <-
-    get_page_insights("7860876103", timeframe = glue::glue("LAST_90_DAYS"), include_info = "targeting_info")
+    get_page_insights("8807334278", timeframe = glue::glue("LAST_90_DAYS"), include_info = "targeting_info")
   
   new_ds <- jb %>% arrange(ds) %>% slice(1) %>% pull(ds)
   # new_ds <- "2023-01-01"
@@ -225,18 +226,18 @@ try({
   print("################ WTM DATA ################")
   
   
-  try({
-    download.file(
-      paste0(
-        "https://data-api.whotargets.me/advertisers-export-csv?countries.alpha2=",
-        str_to_lower(sets$cntry)
-      ),
-      destfile = "data/wtm_advertisers.csv"
-    )
-    
-    thedat <- read_csv("data/wtm_advertisers.csv")
-    
-  })
+  # try({
+  #   download.file(
+  #     paste0(
+  #       "https://data-api.whotargets.me/advertisers-export-csv?countries.alpha2=",
+  #       str_to_lower(sets$cntry)
+  #     ),
+  #     destfile = "data/wtm_advertisers.csv"
+  #   )
+  #   
+  #   thedat <- read_csv("data/wtm_advertisers.csv")
+  #   
+  # })
   
   if (!exists("thedat")) {
     thedat <- tibble(no_data = NULL)
@@ -365,7 +366,18 @@ try({
     # filter(n >= 2) %>%
     # filter(n >= 2 & str_ends(page_id, "0", negate = T)) %>%
     select(-n,-contains("no_data"))  %>% 
-    mutate(total_n = n())
+    mutate(total_n = n()) %>% 
+    filter(page_id != 0) 
+  
+  
+  the_amount <- all_dat %>% names() %>% keep(~str_detect(.x, "amount_spent")) %>% .[1]
+  
+  
+  
+  all_dat <- all_dat %>% 
+    mutate(amount_spent = parse_number(as.character(all_dat[[the_amount]]))) %>% 
+   arrange(desc(amount_spent))
+  
   
   # all_dat %>% filter(str_detect(page_name, "GroenLinks-PvdA"))
   
@@ -377,7 +389,7 @@ try({
   # all_dat %>% filter(page_id == "492150400807824")
   
   
-  fin <- tibble(no_data = T)
+  fin <<- tibble(no_data = T)
   
   scraper <- function(.x, time = tf) {
     
@@ -392,7 +404,7 @@ try({
       
       fin <<-
         # get_targeting(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS")) %>%
-        get_page_insights(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS"), include_info = "targeting_info") %>% 
+        get_page_insights(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS"), include_info = "targeting_info", iso2c = sets$cntry) %>% 
         mutate(tstamp = tstamp)
     
     if (nrow(fin) != 0) {
@@ -446,7 +458,7 @@ try({
       print(glue::glue("New DS: {new_ds}: Old DS: {latest_ds}"))
       
       scrape_dat <- all_dat %>%
-        arrange(page_id) %>%
+        # arrange(page_id) %>%
         # slice(1:150) %>%
         filter(!(page_id %in% latest_elex$page_id))  %>%
         filter(page_id %in% last7$page_id) %>% 
@@ -502,12 +514,12 @@ try({
       
       print(paste0("Number of pages to check: ", nrow(scrape_dat)))
       
-
+      # debugonce(scraper)
       ### save seperately
       election_dat <- all_dat %>%
-        arrange(page_id) %>%
-        # slice(1:50) %>%
-        split(1:nrow(.)) %>%
+        # arrange(page_id) %>%
+        # slice(1) %>%
+        # split(1:nrow(.)) %>%
         map_dfr(scraper)  %>%
         mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) 
       
@@ -526,7 +538,7 @@ try({
       
     }
   })
-  # saveRDS(election_dat, paste0("data/election_dat", tf, ".rds"))
+    # saveRDS(election_dat, paste0("data/election_dat", tf, ".rds"))
   
   # f
   
