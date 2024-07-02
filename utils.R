@@ -741,7 +741,8 @@ get_page_insights <- function (pageid, timeframe = "LAST_30_DAYS", lang = "en-GB
     rvest::html_text() %>% str_split_1("(?<=\\})\\s*(?=\\{)") %>%
     map(jsonlite::fromJSON)
   if (!is.null(out[[1]][["errors"]][["description"]])) {
-    stop(out[[1]][["errors"]][["description"]])
+    message(out[[1]][["errors"]][["description"]])
+    return(tibble(error = T))
   }
   if ("page_info" %in% include_info) {
     page_info1 <- out[[1]][["data"]][["ad_library_page_info"]][["page_info"]]

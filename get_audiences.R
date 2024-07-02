@@ -107,7 +107,7 @@ try({
   # if()
   
   jb <-
-    get_targeting("7860876103", timeframe = glue::glue("LAST_90_DAYS"))
+    get_page_insights("7860876103", timeframe = glue::glue("LAST_90_DAYS"), include_info = "targeting_info")
   
   new_ds <- jb %>% arrange(ds) %>% slice(1) %>% pull(ds)
   # new_ds <- "2023-01-01"
@@ -376,6 +376,7 @@ try({
   # all_dat %>% filter(page_id == "492150400807824")
   
   
+  fin <- tibble(no_data = T)
   
   scraper <- function(.x, time = tf) {
     
@@ -386,9 +387,12 @@ try({
     }
    
     
-    fin <-
-      get_targeting(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS")) %>%
-      mutate(tstamp = tstamp)
+    if(is.null(fin$error)){
+      
+      fin <<-
+        # get_targeting(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS")) %>%
+        get_page_insights(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS"), include_info = "targeting_info") %>% 
+        mutate(tstamp = tstamp)
     
     if (nrow(fin) != 0) {
       if (!dir.exists(glue::glue("targeting/{time}"))) {
@@ -413,6 +417,8 @@ try({
     # print(nrow(fin))
     # })
     return(fin)
+      
+    }
     
   }
   
