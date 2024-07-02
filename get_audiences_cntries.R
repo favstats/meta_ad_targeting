@@ -51,7 +51,7 @@ try({
   if (Sys.info()[["sysname"]] == "Windows") {
     ### CHANGE ME WHEN LOCAL!
     tf <- "30"
-    sets$cntry <- "LU"
+    sets$cntry <- "GB"
     print(paste0("TF: ", tf))
     print(paste0("cntry: ", sets))
     
@@ -80,8 +80,13 @@ try({
     
     # if()
     
+    # jb <-
+    #   get_targeting("7860876103", timeframe = glue::glue("LAST_90_DAYS"))
+    # 
+    # 
     jb <-
-      get_targeting("7860876103", timeframe = glue::glue("LAST_90_DAYS"))
+      get_page_insights("7860876103", timeframe = glue::glue("LAST_90_DAYS"), include_info = "targeting_info")
+    
     
     new_ds <- jb %>% arrange(ds) %>% slice(1) %>% pull(ds)
     # new_ds <- "2023-01-01"
@@ -198,18 +203,18 @@ try({
     print("################ WTM DATA ################")
     
     
-    try({
-      download.file(
-        paste0(
-          "https://data-api.whotargets.me/advertisers-export-csv?countries.alpha2=",
-          str_to_lower(sets$cntry)
-        ),
-        destfile = "data/wtm_advertisers.csv"
-      )
-      
-      thedat <- read_csv("data/wtm_advertisers.csv")
-      
-    })
+    # try({
+    #   download.file(
+    #     paste0(
+    #       "https://data-api.whotargets.me/advertisers-export-csv?countries.alpha2=",
+    #       str_to_lower(sets$cntry)
+    #     ),
+    #     destfile = "data/wtm_advertisers.csv"
+    #   )
+    #   
+    #   thedat <- read_csv("data/wtm_advertisers.csv")
+    #   
+    # })
     
     if (!exists("thedat")) {
       thedat <- tibble(no_data = NULL)
@@ -354,7 +359,8 @@ try({
       # print(paste0(.x$page_name,": ", round(which(internal_page_ids$page_id == .x$page_id)/nrow(internal_page_ids)*100, 2)))
       
       fin <-
-        get_targeting(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS")) %>%
+        # get_targeting(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS")) %>%
+        get_page_insights(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS"), include_info = "targeting_info") %>% 
         mutate(tstamp = tstamp)
       
       if (nrow(fin) != 0) {
@@ -552,7 +558,7 @@ try({
     
     print("################ FIN ################")
     
-  }
+  # }
   
   # unlink("node_modules", recursive = T, force = T)
   # unlink("out", recursive = T, force = T)
