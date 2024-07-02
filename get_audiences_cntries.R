@@ -353,39 +353,48 @@ try({
     
     # all_dat %>% filter(page_id == "492150400807824")
     
-    
+    fin <- tibble(no_data = T)
     
     scraper <- function(.x, time = tf) {
       # print(paste0(.x$page_name,": ", round(which(internal_page_ids$page_id == .x$page_id)/nrow(internal_page_ids)*100, 2)))
       
-      fin <-
-        # get_targeting(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS")) %>%
-        get_page_insights(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS"), include_info = "targeting_info") %>% 
-        mutate(tstamp = tstamp)
-      
-      if (nrow(fin) != 0) {
-        if (!dir.exists(glue::glue("targeting/{time}"))) {
-          dir.create(glue::glue("targeting/{time}"), recursive = T)
+      if(is.null(fin$error)){
+        
+        fin <<-
+          # get_targeting(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS")) %>%
+          get_page_insights(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS"), include_info = "targeting_info") %>% 
+          mutate(tstamp = tstamp)
+        
+        
+        
+        
+        if (nrow(fin) != 0) {
+          if (!dir.exists(glue::glue("targeting/{time}"))) {
+            dir.create(glue::glue("targeting/{time}"), recursive = T)
+          }
+          
+          path <-
+            paste0(glue::glue("targeting/{time}/"), .x$page_id, ".rds")
+          # if(file.exists(path)){
+          #   ol <- read_rds(path)
+          #
+          #   saveRDS(fin %>% bind_rows(ol), file = path)
+          # } else {
+          
+          saveRDS(fin, file = path)
+          # }
+        } else {
+          fin <- tibble(internal_id = .x$page_id, no_data = T) %>%
+            mutate(tstamp = tstamp)
         }
         
-        path <-
-          paste0(glue::glue("targeting/{time}/"), .x$page_id, ".rds")
-        # if(file.exists(path)){
-        #   ol <- read_rds(path)
-        #
-        #   saveRDS(fin %>% bind_rows(ol), file = path)
-        # } else {
+        # print(nrow(fin))
+        # })
+        return(fin)
         
-        saveRDS(fin, file = path)
-        # }
-      } else {
-        fin <- tibble(internal_id = .x$page_id, no_data = T) %>%
-          mutate(tstamp = tstamp)
       }
       
-      # print(nrow(fin))
-      # })
-      return(fin)
+
       
     }
     
