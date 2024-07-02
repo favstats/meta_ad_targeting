@@ -700,3 +700,4 @@ hc_plot_boxes <- function(x, trans_internal, subtitle = subtitle_text, credits =
   
   return(hc_plot)
 }
+
