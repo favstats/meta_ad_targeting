@@ -25,6 +25,7 @@ try({
   library(lubridate)
   library(rvest)
   library(piggyback)
+  # library(metatargetr)
   
   # sets <- jsonlite::fromJSON("settings.json")
   #
@@ -90,7 +91,7 @@ try({
   #   get_page_insights("7860876103", timeframe = glue::glue("LAST_90_DAYS"))
   
   jb <-
-    get_targeting("7860876103", timeframe = glue::glue("LAST_90_DAYS"))
+    get_page_insights("7860876103", timeframe = glue::glue("LAST_90_DAYS"), include_info = "targeting_info")
   
   new_ds <- jb %>% arrange(ds) %>% slice(1) %>% pull(ds)
   # new_ds <- "2023-01-01"
