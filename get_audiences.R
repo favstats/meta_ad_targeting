@@ -25,6 +25,7 @@ try({
   # debugonce(get_targeting)
   
   library(httr)
+  library(httr2)
   library(tidyverse)
   library(lubridate)
   library(rvest)
