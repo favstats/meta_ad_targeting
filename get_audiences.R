@@ -474,11 +474,13 @@ try({
         
         print("new data to be uploaded")
         
-        
+        if(is.null(enddat$page_id)){
+          enddat$page_id <- enddat$internal_id
+        }
         
         election_dat  <- enddat %>%
           mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) %>%
-          rename(page_id = internal_id) %>%
+          # rename(page_id = internal_id) %>%
           left_join(all_dat) %>%
           bind_rows(latest_elex %>% filter(!(page_id %in% enddat$page_id))) %>%
           distinct()
@@ -499,14 +501,21 @@ try({
       print(glue::glue("Complete new Data. New DS: {new_ds}: Old DS: {latest_ds} 2"))
       
       print(paste0("Number of pages to check: ", nrow(scrape_dat)))
+      
+
       ### save seperately
       election_dat <- all_dat %>%
         arrange(page_id) %>%
         # slice(1:50) %>%
         split(1:nrow(.)) %>%
         map_dfr(scraper)  %>%
-        mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) %>%
-        rename(page_id = internal_id)  %>%
+        mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) 
+      
+      if(is.null(election_dat$page_id)){
+        election_dat$page_id <- election_dat$internal_id
+      }
+      
+      election_dat <- election_dat %>% 
         left_join(all_dat)
       
       dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
