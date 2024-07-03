@@ -416,7 +416,7 @@ map_dfr_progress <- function(.x, .f, ...) {
   .f <- purrr::as_mapper(.f, ...)
   pb <- progress::progress_bar$new(
     total = length(.x), 
-    format = glue::glue(" (:spin) [:bar] :percent | :current / :total | eta: :eta | {sets$cntry}"),
+    format = glue::glue(" (:spin) [:bar] :percent | :current / :total | eta: :eta"),
     # format = " downloading [:bar] :percent eta: :eta",
     force = TRUE)
   
@@ -742,11 +742,12 @@ get_page_insights <- function (pageid, timeframe = "LAST_30_DAYS", lang = "en-GB
     rvest::html_text() %>% str_split_1("(?<=\\})\\s*(?=\\{)") %>%
     map(jsonlite::fromJSON)
   if (is.null(out[[1]][["data"]][["page"]][["ad_library_page_targeting_insight"]])) {
-    message(out[[1]][["errors"]][["description"]])
-    rate_limit <- stringr::str_detect(as.character(out[[1]][["errors"]]), "Rate limit exceeded")
-    if(rate_limit){
-      return(tibble(error = T))
-    }
+    # stop(out[[1]][["errors"]][["description"]])
+    message("No targeting  insight. Maybe you are being blocked, maybe it's just empty for some reason.")
+    # rate_limit <- any(stringr::str_detect(as.character(out[[1]][["errors"]]), "Rate limit exceeded"))
+    # if(rate_limit){
+    #   return(tibble(error = T))
+    # }
   }
   if ("page_info" %in% include_info) {
     page_info1 <- out[[1]][["data"]][["ad_library_page_info"]][["page_info"]]
@@ -835,3 +836,7 @@ get_page_insights <- function (pageid, timeframe = "LAST_30_DAYS", lang = "en-GB
   return(fin)
 }
 
+
+# fin <- arrow::read_parquet("https://github.com/favstats/meta_ad_targeting/releases/download/TW-last_30_days/2024-07-01.parquet")
+# 
+# fin %>% count(page_id)
