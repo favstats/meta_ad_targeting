@@ -78,7 +78,7 @@ try({
   
   if (Sys.info()[["effective_user"]] %in% c("fabio", "favstats")) {
     ### CHANGE ME WHEN LOCAL!
-    tf <- "30"
+    tf <- "7"
     sets$cntry <- "GB"
     print(paste0("TF: ", tf))
     print(paste0("cntry: ", sets))
@@ -401,7 +401,7 @@ try({
     }
    
     
-    if(is.null(fin$error)){
+    # if(is.null(fin$error)){
       
       fin <<-
         # get_targeting(internal$page_id, timeframe = glue::glue("LAST_{time}_DAYS")) %>%
@@ -432,7 +432,7 @@ try({
     # })
     return(fin)
       
-    }
+    # }
     
   }
   
@@ -521,7 +521,7 @@ try({
         # arrange(page_id) %>%
         # slice(1:2) %>%
         split(1:nrow(.)) %>%
-        map_dfr_progress(scraper)  %>%
+        map_dfr(scraper)  %>%
         mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) 
       
       if(is.null(election_dat$page_id)){
