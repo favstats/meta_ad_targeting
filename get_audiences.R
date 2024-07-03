@@ -520,7 +520,7 @@ try({
         # arrange(page_id) %>%
         # slice(1:2) %>%
         split(1:nrow(.)) %>%
-        map_dfr(scraper)  %>%
+        map_dfr_progress(scraper)  %>%
         mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) 
       
       if(is.null(election_dat$page_id)){
