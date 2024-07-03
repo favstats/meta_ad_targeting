@@ -75,14 +75,14 @@ try({
   
   # full_cntry_list$iso2c %>% dput()
   
-  if (Sys.info()[["effective_user"]] == "fabio") {
+  # if (Sys.info()[["effective_user"]] == "fabio") {
     ### CHANGE ME WHEN LOCAL!
     tf <- "30"
-    sets$cntry <- "GB"
+    sets$cntry <- "IT"
     print(paste0("TF: ", tf))
     print(paste0("cntry: ", sets))
     
-  }
+  # }
   
 
   # for (cntryy in full_cntry_list$iso2c) {
@@ -391,11 +391,11 @@ try({
   
   fin <<- tibble(no_data = T)
   
-  scraper <- function(.x, time = tf) {
+  scraper <- function(internal, time = tf) {
     
-    if((which(scrape_dat$page_id == .x$page_id) %% round(nrow(scrape_dat)/4, -1)) == 0){
+    if((which(scrape_dat$page_id == internal$page_id) %% round(nrow(scrape_dat)/4, -1)) == 0){
       
-      print(paste0(.x$page_name,": ", round(which(scrape_dat$page_id == .x$page_id)/nrow(scrape_dat)*100, 2)))
+      print(paste0(internal$page_name,": ", round(which(scrape_dat$page_id == internal$page_id)/nrow(scrape_dat)*100, 2)))
       
     }
    
@@ -403,8 +403,8 @@ try({
     if(is.null(fin$error)){
       
       fin <<-
-        # get_targeting(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS")) %>%
-        get_page_insights(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS"), include_info = "targeting_info", iso2c = sets$cntry) %>% 
+        # get_targeting(internal$page_id, timeframe = glue::glue("LAST_{time}_DAYS")) %>%
+        get_page_insights(internal$page_id, timeframe = glue::glue("LAST_{time}_DAYS"), include_info = "targeting_info", iso2c = sets$cntry) %>% 
         mutate(tstamp = tstamp)
     
     if (nrow(fin) != 0) {
@@ -413,7 +413,7 @@ try({
       }
       
       path <-
-        paste0(glue::glue("targeting/{time}/"), .x$page_id, ".rds")
+        paste0(glue::glue("targeting/{time}/"), internal$page_id, ".rds")
       # if(file.exists(path)){
       #   ol <- read_rds(path)
       #
@@ -423,7 +423,7 @@ try({
       saveRDS(fin, file = path)
       # }
     } else {
-      fin <- tibble(internal_id = .x$page_id, no_data = T) %>%
+      fin <- tibble(internal_id = internal$page_id, no_data = T) %>%
         mutate(tstamp = tstamp)
     }
     
@@ -518,8 +518,8 @@ try({
       ### save seperately
       election_dat <- all_dat %>%
         # arrange(page_id) %>%
-        # slice(1) %>%
-        # split(1:nrow(.)) %>%
+        # slice(1:2) %>%
+        split(1:nrow(.)) %>%
         map_dfr(scraper)  %>%
         mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) 
       
