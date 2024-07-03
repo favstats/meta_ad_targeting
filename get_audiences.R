@@ -3,7 +3,7 @@
 # rate_limit <<- F
 try({
   
-  if (Sys.info()[["effective_user"]] != "fabio") {
+  if (!(Sys.info()[["effective_user"]] %in% c("fabio", "favstats"))) {
     remove.packages("arrow")
   }
   
@@ -44,9 +44,10 @@ try({
         paste(getRversion(), R.version["platform"], R.version["arch"], R.version["os"])
       )
   )
-  
+  if (!(Sys.info()[["effective_user"]] %in% c("fabio", "favstats"))) {
   install.packages("arrow", repos = "https://packagemanager.rstudio.com/all/__linux__/focal/latest")
   arrow::install_arrow(verbose = F) # verbose output to debug install errors
+  }
   # print(arrow::arrow_info())
   # print("##### did you install arrow? #####")
   
@@ -75,14 +76,14 @@ try({
   
   # full_cntry_list$iso2c %>% dput()
   
-  # if (Sys.info()[["effective_user"]] == "fabio") {
+  if (Sys.info()[["effective_user"]] %in% c("fabio", "favstats")) {
     ### CHANGE ME WHEN LOCAL!
     tf <- "30"
-    sets$cntry <- "IT"
+    sets$cntry <- "GB"
     print(paste0("TF: ", tf))
     print(paste0("cntry: ", sets))
     
-  # }
+  }
   
 
   # for (cntryy in full_cntry_list$iso2c) {
@@ -520,7 +521,7 @@ try({
         # arrange(page_id) %>%
         # slice(1:2) %>%
         split(1:nrow(.)) %>%
-        map_dfr(scraper)  %>%
+        map_dfr_progress(scraper)  %>%
         mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) 
       
       if(is.null(election_dat$page_id)){

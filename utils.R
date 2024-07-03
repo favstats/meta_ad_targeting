@@ -743,7 +743,10 @@ get_page_insights <- function (pageid, timeframe = "LAST_30_DAYS", lang = "en-GB
     map(jsonlite::fromJSON)
   if (is.null(out[[1]][["data"]][["page"]][["ad_library_page_targeting_insight"]])) {
     message(out[[1]][["errors"]][["description"]])
-    return(tibble(error = T))
+    rate_limit <- stringr::str_detect(as.character(out[[1]][["errors"]]), "Rate limit exceeded")
+    if(rate_limit){
+      return(tibble(error = T))
+    }
   }
   if ("page_info" %in% include_info) {
     page_info1 <- out[[1]][["data"]][["ad_library_page_info"]][["page_info"]]
