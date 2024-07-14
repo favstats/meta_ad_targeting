@@ -53,7 +53,7 @@ try({
   if (Sys.info()[["sysname"]] == "Windows") {
     ### CHANGE ME WHEN LOCAL!
     tf <- "30"
-    sets$cntry <- "LU"
+    sets$cntry <- "DE"
     print(paste0("TF: ", tf))
     print(paste0("cntry: ", sets))
     
@@ -208,18 +208,18 @@ try({
   print("################ WTM DATA ################")
   
   
-  try({
-    download.file(
-      paste0(
-        "https://data-api.whotargets.me/advertisers-export-csv?countries.alpha2=",
-        str_to_lower(sets$cntry)
-      ),
-      destfile = "data/wtm_advertisers.csv"
-    )
-    
-    thedat <- read_csv("data/wtm_advertisers.csv")
-    
-  })
+  # try({
+  #   download.file(
+  #     paste0(
+  #       "https://data-api.whotargets.me/advertisers-export-csv?countries.alpha2=",
+  #       str_to_lower(sets$cntry)
+  #     ),
+  #     destfile = "data/wtm_advertisers.csv"
+  #   )
+  #   
+  #   thedat <- read_csv("data/wtm_advertisers.csv")
+  #   
+  # })
   
   if (!exists("thedat")) {
     thedat <- tibble(no_data = NULL)
@@ -423,7 +423,7 @@ try({
     }
     
     
-    c("page_info", "targeting_info")
+    # c("page_info", "targeting_info")
     # print(nrow(fin))
     # })
     return(list(page_info = fin2, targeting_info = fin))
@@ -621,6 +621,7 @@ try({
       try({
         
         # debugonce(pb_upload_file_fr)
+        # debugonce(delete_asset_by_filename)
         pb_upload_file_fr(
           paste0(sets$cntry,"-page_info", ".parquet"),
           repo = "favstats/meta_ad_targeting",
