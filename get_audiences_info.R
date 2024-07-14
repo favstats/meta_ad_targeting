@@ -33,6 +33,7 @@ try({
   # title_txt[which(str_detect(title_txt, "title"))[1]] <-  glue::glue('  title: "{sets$dashboard}"')
   # write_lines(title_txt, "_site/_quarto.yml")
   
+  
   eu_countries <- c("AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", 
                     "FR", "GR", "HR", "HU", "IE", "IT", "LT", "LU", "LV", "MT", 
                     "NL", "PL", "PT", "RO", "SE", "SI", "SK", "US", "MX", "NZ", 
