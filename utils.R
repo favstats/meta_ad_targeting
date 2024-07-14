@@ -444,14 +444,38 @@ map_chr_progress <- function(.x, .f, ...) {
 
 
 library(gh)
+get_all_assets <- function(owner, repo, release_id, token) {
+  page <- 1
+  all_assets <- list()
+  
+  repeat {
+    assets <- gh::gh("GET /repos/:owner/:repo/releases/:release_id/assets",
+                     owner = owner, repo = repo, release_id = release_id, 
+                     .token = token, .params = list(page = page, per_page = 100))
+    
+    if (length(assets) == 0) {
+      break
+    }
+    
+    all_assets <- c(all_assets, assets)
+    page <- page + 1
+  }
+  
+  return(all_assets)
+}
 
 # Function to delete a release asset by filename
 delete_asset_by_filename <- function(owner, repo, release_id, filename, .token  = gh::gh_token()) {
   # Retrieve all assets for the specified release
-  assets <- gh::gh("GET /repos/:owner/:repo/releases/:release_id/assets",
-               owner = owner, repo = repo, release_id = release_id, .token = .token)
   
-  print(assets)
+
+  # Use the function
+  assets <- get_all_assets(owner, repo, release_id, .token)
+  
+  # assets <- gh::gh("GET /repos/:owner/:repo/releases/:release_id/assets",
+  #              owner = owner, repo = repo, release_id = release_id, .token = .token)
+  # 
+  # print(all_assets)
   
   # Find the asset by filename
   asset <- purrr::keep(assets, ~ .x$name == filename)
