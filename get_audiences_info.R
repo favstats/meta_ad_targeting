@@ -50,7 +50,7 @@ try({
   
   # full_cntry_list$iso2c %>% dput()
   
-  if (Sys.info()[["sysname"]] == "Windows") {
+  if (Sys.info()[["effective_user"]] == "favoo") {
     ### CHANGE ME WHEN LOCAL!
     tf <- "30"
     sets$cntry <- "DE"
