@@ -80,3 +80,5 @@ jobs:
             any::httr2
       - name: "Script - Meta Run for ${{ matrix.iso-code }}"
         run: Rscript 'get_audiences_info.R' "30" "${{ matrix.iso-code }}"
+      - name: "Update Lag"
+        run: Rscript 'slack.R'
