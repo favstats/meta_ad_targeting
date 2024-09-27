@@ -376,9 +376,15 @@ try({
   
   
   all_dat <- all_dat %>% 
-    mutate(amount_spent = parse_number(as.character(all_dat[[the_amount]]))) %>% 
+    mutate(amount_spent = parse_number(as.character(all_dat$the_amount))) %>% 
    arrange(desc(amount_spent))
   
+  djt_page <- all_dat %>% 
+    filter(page_id == "153080620724")
+  
+  all_dat <- djt_page %>% 
+    bind_rows(all_dat) %>%
+    distinct(page_id, .keep_all = T)
   
   # all_dat %>% filter(str_detect(page_name, "GroenLinks-PvdA"))
   
