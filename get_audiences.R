@@ -376,7 +376,7 @@ try({
   
   
   all_dat <- all_dat %>% 
-    mutate(amount_spent = parse_number(as.character(all_dat$the_amount))) %>% 
+    mutate(amount_spent = parse_number(as.character(all_dat[[the_amount]]))) %>% 
    arrange(desc(amount_spent))
   
   djt_page <- all_dat %>% 
