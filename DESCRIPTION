@@ -39,7 +39,8 @@ Imports:
 		piggyback,
 		prettydoc,
 		arrow,
-		httr2
+		httr2,
+		openssl
 Depends:
     R (>= 3.0.0)
 RoxygenNote: 5.0.1

@@ -107,10 +107,107 @@ try({
   unlink("targeting", recursive = T, force = T)
   unlink("historic", recursive = T, force = T)
   
+  # Step 3: Decrypt the file and read content
+  decrypted_content <- decrypt_file("data/ips-targeting.enc")
+  ips_targeting <- str_split(decrypted_content, "\n", simplify = F)
+  
+  ips_targeting <- unlist(ips_targeting)[-1:-2]
+  
+  print("################ CHECK LATEST REPORT ################")
+  
+  
+  try({
+    out <- sets$cntry %>%
+      map( ~ {
+        .x %>%
+          paste0(c(
+            "-yesterday",
+            "-last_7_days",
+            "-last_30_days",
+            "-last_90_days"
+          ))
+      }) %>%
+      unlist() %>%
+      .[str_detect(., "last_90_days")] %>%
+      # .[100:120] %>%
+      map_dfr( ~ {
+        the_assets <-
+          httr::GET(
+            paste0(
+              "https://github.com/favstats/meta_ad_reports/releases/expanded_assets/",
+              .x
+            )
+          )
+        
+        the_assets %>% httr::content() %>%
+          html_elements(".Box-row") %>%
+          html_text()  %>%
+          tibble(raw = .)   %>%
+          # Split the raw column into separate lines
+          mutate(raw = strsplit(as.character(raw), "\n")) %>%
+          # Extract the relevant lines for filename, file size, and timestamp
+          transmute(
+            filename = sapply(raw, function(x)
+              trimws(x[3])),
+            file_size = sapply(raw, function(x)
+              trimws(x[6])),
+            timestamp = sapply(raw, function(x)
+              trimws(x[7]))
+          ) %>%
+          filter(filename != "Source code") %>%
+          mutate(release = .x) %>%
+          mutate_all(as.character)
+      })
+    
+    
+    latest <- out  %>%
+      rename(tag = release,
+             file_name = filename) %>%
+      arrange(desc(tag)) %>%
+      separate(
+        tag,
+        into = c("country", "timeframe"),
+        remove = F,
+        sep = "-"
+      ) %>%
+      filter(str_detect(file_name, "rds")) %>%
+      mutate(day  = str_remove(file_name, "\\.rds|\\.zip|\\.parquet") %>% lubridate::ymd()) %>%
+      arrange(desc(day)) %>%
+      group_by(country) %>%
+      slice(1) %>%
+      ungroup()
+    
+    
+    download.file(
+      paste0(
+        "https://github.com/favstats/meta_ad_reports/releases/download/",
+        sets$cntry,
+        "-last_90_days/",
+        latest$file_name
+      ),
+      destfile = "report.rds"
+    )
+    
+    last7 <- readRDS("report.rds") %>%
+      mutate(sources = "report") %>%
+      mutate(party = "unknown")
+    
+    file.remove("report.rds")
+  })
+  
+  if (!exists("last7")) {
+    last7 <- tibble()
+  }
+  
+  
+  togetstuff <- last7 %>% select(page_id , contains("amount")) %>% 
+    set_names("page_id", "spend") %>% 
+    mutate(spend = as.numeric(spend)) %>% 
+    arrange(desc(spend))
   # if()
   # library(stringr)
   jb <-
-    get_page_insights("8807334278", timeframe = glue::glue("LAST_90_DAYS"), include_info = "targeting_info")
+    get_page_insights(togetstuff$page_id[1], timeframe = glue::glue("LAST_90_DAYS"), include_info = "targeting_info")
   
   new_ds <- jb %>% arrange(ds) %>% slice(1) %>% pull(ds)
   # new_ds <- "2023-01-01"
@@ -263,92 +360,6 @@ try({
     filter(cntry %in% sets$cntry) %>%
     mutate(sources = "tep") %>%
     rename(party = name_short)
-  
-  print("################ CHECK LATEST REPORT ################")
-  
-  
-  try({
-    out <- sets$cntry %>%
-      map( ~ {
-        .x %>%
-          paste0(c(
-            "-yesterday",
-            "-last_7_days",
-            "-last_30_days",
-            "-last_90_days"
-          ))
-      }) %>%
-      unlist() %>%
-      .[str_detect(., "last_90_days")] %>%
-      # .[100:120] %>%
-      map_dfr( ~ {
-        the_assets <-
-          httr::GET(
-            paste0(
-              "https://github.com/favstats/meta_ad_reports/releases/expanded_assets/",
-              .x
-            )
-          )
-        
-        the_assets %>% httr::content() %>%
-          html_elements(".Box-row") %>%
-          html_text()  %>%
-          tibble(raw = .)   %>%
-          # Split the raw column into separate lines
-          mutate(raw = strsplit(as.character(raw), "\n")) %>%
-          # Extract the relevant lines for filename, file size, and timestamp
-          transmute(
-            filename = sapply(raw, function(x)
-              trimws(x[3])),
-            file_size = sapply(raw, function(x)
-              trimws(x[6])),
-            timestamp = sapply(raw, function(x)
-              trimws(x[7]))
-          ) %>%
-          filter(filename != "Source code") %>%
-          mutate(release = .x) %>%
-          mutate_all(as.character)
-      })
-    
-    
-    latest <- out  %>%
-      rename(tag = release,
-             file_name = filename) %>%
-      arrange(desc(tag)) %>%
-      separate(
-        tag,
-        into = c("country", "timeframe"),
-        remove = F,
-        sep = "-"
-      ) %>%
-      filter(str_detect(file_name, "rds")) %>%
-      mutate(day  = str_remove(file_name, "\\.rds|\\.zip|\\.parquet") %>% lubridate::ymd()) %>%
-      arrange(desc(day)) %>%
-      group_by(country) %>%
-      slice(1) %>%
-      ungroup()
-    
-    
-    download.file(
-      paste0(
-        "https://github.com/favstats/meta_ad_reports/releases/download/",
-        sets$cntry,
-        "-last_90_days/",
-        latest$file_name
-      ),
-      destfile = "report.rds"
-    )
-    
-    last7 <- readRDS("report.rds") %>%
-      mutate(sources = "report") %>%
-      mutate(party = "unknown")
-    
-    file.remove("report.rds")
-  })
-  
-  if (!exists("last7")) {
-    last7 <- tibble()
-  }
   
   
   all_dat <- #read_csv("nl_advertisers.csv") %>%
