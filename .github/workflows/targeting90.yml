@@ -74,5 +74,6 @@ jobs:
             any::DT
             any::piggyback
             any::httr2
+            any::openssl
       - name: "Script - Meta Run for ${{ matrix.iso-code }}"
         run: Rscript 'get_audiences.R' "90" "${{ matrix.iso-code }}"
