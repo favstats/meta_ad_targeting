@@ -789,6 +789,12 @@ get_page_insights <- function (pageid, timeframe = "LAST_30_DAYS", lang = "en-GB
                                iso2c = "US", include_info = c("page_info", "targeting_info"),
                                join_info = T)
 {
+  
+  
+  prx <- sample(ips_targeting, 1)
+  prxs <- stringr::str_split(prx, "(?<=\\d)\\:", n = 2)
+  
+  
   ua_list <- c("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36",
                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36")
