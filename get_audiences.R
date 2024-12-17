@@ -30,6 +30,7 @@ try({
   library(lubridate)
   library(rvest)
   library(piggyback)
+  library(openssl)
   
   Sys.setenv(LIBARROW_MINIMAL = "false")
   Sys.setenv("NOT_CRAN" = "true")
