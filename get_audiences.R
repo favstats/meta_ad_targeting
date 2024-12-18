@@ -31,6 +31,10 @@ try({
   library(rvest)
   library(piggyback)
   library(openssl)
+  library(jsonlite)
+  
+  
+
   
   Sys.setenv(LIBARROW_MINIMAL = "false")
   Sys.setenv("NOT_CRAN" = "true")
@@ -99,6 +103,33 @@ try({
   #     
   #   }
   
+  # Telegram bot setup
+  TELEGRAM_BOT_ID <- Sys.getenv("TELEGRAM_BOT_ID")
+  TELEGRAM_GROUP_ID <- Sys.getenv("TELEGRAM_GROUP_ID")
+  
+  # Function to send a Telegram message
+  send_telegram_message <- function(message) {
+    url <- paste0("https://api.telegram.org/bot", TELEGRAM_BOT_ID, "/sendMessage")
+    httr::POST(url, body = list(chat_id = TELEGRAM_GROUP_ID, text = message), encode = "form")
+  }
+  
+  # Function to log updates with Telegram integration
+  log_update <- function(stage, tf, cntry, details = "") {
+    message <- glue::glue(
+      "
+🔹 *Update: {stage}* 🔹
+🌍 Country: {cntry}
+⏳ Timeframe: {tf}
+🕒 Time: {Sys.time()}
+{details}
+  "
+    )
+    send_telegram_message(message)
+  }
+  
+  log_update <- possibly(log_update, otherwise = NULL, quiet = F)
+  
+  log_update("Script Started", tf,   sets$cntry, details = "Initializing data processing...")
   
   
   # if(rate_limit){
