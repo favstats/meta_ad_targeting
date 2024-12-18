@@ -35,6 +35,9 @@ jobs:
       contents: write
     env:
       GITHUB_PAT: ${{ secrets.GH_PAT }}
+      ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+      TELEGRAM_BOT_ID: ${{ secrets.TELEGRAM_BOT_ID }}
+      TELEGRAM_GROUP_ID: ${{ secrets.TELEGRAM_GROUP_ID }}
     steps:
       - name: Setup R
         uses: r-lib/actions/setup-r@v2
