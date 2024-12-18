@@ -813,6 +813,12 @@ get_page_insights <- function (pageid, timeframe = "LAST_30_DAYS", lang = "en-GB
   if (!is.null(out[[1]][["errors"]][["description"]])) {
     message(out[[1]][["errors"]][["description"]])
     
+    
+    fetch_page_info <- ifelse("page_info" %in% include_info, 
+                              "true", "false")
+    
+    
+    
     resp <- httr2::request("https://www.facebook.com/api/graphql/") %>% 
       httr2::req_headers(`Accept-Language` = paste0(lang, 
                                                     ",", stringr::str_split(lang, "-") %>% unlist() %>% 
