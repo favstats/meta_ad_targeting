@@ -715,7 +715,9 @@ generate_and_store_key <- function() {
 
 # Function to encrypt a file
 encrypt_file <- function(input_file, output_file) {
+  print("check key")
   key <- base64_dec(Sys.getenv("ENCRYPTION_KEY")) # Retrieve the encryption key securely
+  print("key checked")
   data <- read_lines(input_file) %>% paste(collapse = "\n") # Read file content
   encrypted_data <- aes_cbc_encrypt(charToRaw(data), key) # Encrypt the data
   writeBin(as.raw(encrypted_data), output_file) # Ensure encrypted data is written as raw binary
