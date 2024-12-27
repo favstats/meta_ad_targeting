@@ -3,7 +3,8 @@
 This repository is designed to streamline the retrieval and processing of targeting data from Meta's advertising platform. The hope is that this tool is useful for researchers, analysts, and organizations seeking to understand ad targeting strategies across different countries and timeframes. 
 
 ## Purpose
-Meta's advertising platform only provides data for limited, predefined timeframes: the last 7, 30, and 90 days. Consequently, historical data is often inaccessible once it surpasses these time windows. This repository addresses this limitation by archiving and structuring historical data, enabling researchers and analysts to access datasets that would otherwise be unavailable.
+
+Meta's advertising platform only provides data for limited, predefined timeframes: the last 7, 30, and 90 days. Consequently, historical data is inaccessible once it surpasses these time windows. This repository addresses this limitation by archiving and structuring historical data, enabling researchers and analysts to access datasets that would otherwise be unavailable.
 
 This repository provides a framework to:
 - Access and process data on political or commercial ad targeting.
