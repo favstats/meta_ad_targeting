@@ -12,7 +12,7 @@ try({
   
   sets <- list()
   tf <- outcome[1]
-  sets$cntry <- outcome[2]
+  the_cntry <- outcome[2]
   # here::i_am("wtm_mx.Rproj")
   
   print(outcome)
@@ -84,7 +84,7 @@ try({
   if (Sys.info()[["effective_user"]] %in% c("fabio", "favstats")) {
     ### CHANGE ME WHEN LOCAL!
     tf <- "7"
-    sets$cntry <- "GB"
+    the_cntry <- "GB"
     print(paste0("TF: ", tf))
     print(paste0("cntry: ", sets))
     
@@ -92,8 +92,8 @@ try({
   
 
   # for (cntryy in full_cntry_list$iso2c) {
-  #   sets$cntry <-  cntryy
-  #   print(sets$cntry)
+  #   the_cntry <-  cntryy
+  #   print(the_cntry)
   #   
   #   if(!exists("rate_limit")){
   #     rate_limit <<- F
@@ -129,7 +129,7 @@ try({
 #   
 #   log_update <- possibly(log_update, otherwise = NULL, quiet = F)
 #   
-#   log_update("Script Started", tf,   sets$cntry, details = "Initializing data processing...")
+#   log_update("Script Started", tf,   the_cntry, details = "Initializing data processing...")
 #   
   
   # if(rate_limit){
@@ -152,7 +152,7 @@ try({
   
   
   try({
-    out <- sets$cntry %>%
+    out <- the_cntry %>%
       map( ~ {
         .x %>%
           paste0(c(
@@ -216,7 +216,7 @@ try({
     download.file(
       paste0(
         "https://github.com/favstats/meta_ad_reports/releases/download/",
-        sets$cntry,
+        the_cntry,
         "-last_90_days/",
         latest$file_name
       ),
@@ -311,7 +311,7 @@ try({
   try({
     # latest_elex <- readRDS(paste0("data/election_dat", tf, ".rds"))
     
-    out <- sets$cntry %>%
+    out <- the_cntry %>%
       map( ~ {
         .x %>%
           paste0(c("-last_7_days", "-last_30_days",
@@ -369,7 +369,7 @@ try({
         arrow::read_parquet(
           paste0(
             "https://github.com/favstats/meta_ad_targeting/releases/download/",
-            sets$cntry,
+            the_cntry,
             "-last_",
             tf,
             "_days/",
@@ -422,7 +422,7 @@ try({
   #   download.file(
   #     paste0(
   #       "https://data-api.whotargets.me/advertisers-export-csv?countries.alpha2=",
-  #       str_to_lower(sets$cntry)
+  #       str_to_lower(the_cntry)
   #     ),
   #     destfile = "data/wtm_advertisers.csv"
   #   )
@@ -436,7 +436,7 @@ try({
   }
   
   
-  if (sets$cntry %in% country_codes & nrow(thedat) != 0) {
+  if (the_cntry %in% country_codes & nrow(thedat) != 0) {
     wtm_data <- read_csv("data/wtm_advertisers.csv") %>% #names
       select(page_id = advertisers_platforms.advertiser_platform_ref,
              page_name = name,
@@ -451,7 +451,7 @@ try({
   polsample <- readRDS("data/polsample.rds")
   
   tep_dat <- polsample %>%
-    filter(cntry %in% sets$cntry) %>%
+    filter(cntry %in% the_cntry) %>%
     mutate(sources = "tep") %>%
     rename(party = name_short)
   
@@ -516,7 +516,7 @@ try({
       
       fin <<-
         # get_targeting(internal$page_id, timeframe = glue::glue("LAST_{time}_DAYS")) %>%
-        get_page_insights(internal$page_id, timeframe = glue::glue("LAST_{time}_DAYS"), include_info = "targeting_info", iso2c = sets$cntry) %>% 
+        get_page_insights(internal$page_id, timeframe = glue::glue("LAST_{time}_DAYS"), include_info = "targeting_info", iso2c = the_cntry) %>% 
         mutate(tstamp = tstamp)
     
     if (nrow(fin) != 0) {
@@ -662,7 +662,7 @@ try({
   
   # sources("start.R")
   
-  the_tag <- paste0(sets$cntry, "-", "last_", tf, "_days")
+  the_tag <- paste0(the_cntry, "-", "last_", tf, "_days")
   the_date <- new_ds
   
   # full_repos
@@ -676,7 +676,7 @@ try({
   releases <- readRDS("data/releases.rds")
   
   cntry_name <- full_cntry_list %>%
-    filter(iso2c == sets$cntry) %>%
+    filter(iso2c == the_cntry) %>%
     pull(country)
   
   if(!(the_tag %in% releases$tag_name)){
@@ -722,7 +722,7 @@ try({
       
     })
     
-    print(paste0("################ UPLOADED FILE ################: ", sets$cntry))
+    print(paste0("################ UPLOADED FILE ################: ", the_cntry))
     
     
   } else {
