@@ -799,6 +799,8 @@ get_page_insights <- function (pageid, timeframe = "LAST_30_DAYS", lang = "en-GB
 {
   
   
+  proxy <- sample(c(T,F), 1)
+  
   # Terminate R session if the maximum error count is reached
   if (consecutive_error_count >= max_consecutive_errors) {
     # message("Max consecutive errors reached. Exiting session.")
