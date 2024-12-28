@@ -1,0 +1,80 @@
+# Meta Ad Targeting Database
+
+This repository is designed to streamline the retrieval and processing of targeting data from Meta's advertising platform. The hope is that this tool is useful for researchers, analysts, and organizations seeking to understand ad targeting strategies across different countries and timeframes. 
+
+
+💡 *Support Open-Source Development*
+
+If `metatargetr` has been helpful to you, consider [supporting the project](https://www.buymeacoffee.com/favstats)! Every contribution keeps the maintenance work going and helps me develop new features 😊
+
+```{=html}
+<div style="text-align: right;">
+  <a href="https://www.buymeacoffee.com/favstats" target="_blank">
+    <img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=favstats&button_colour=FFDD00&font_colour=000000&font_family=Arial&outline_colour=000000&coffee_colour=ffffff" alt="Buy Me a Coffee" style="height: 40px; width: auto;">
+  </a>
+</div>
+```
+
+---
+
+## Purpose
+
+> Meta's advertising platform only provides data for limited, predefined timeframes: the last 7, 30, and 90 days. Consequently, historical data is inaccessible once it surpasses these time windows. This repository addresses this limitation by archiving and structuring historical data, enabling researchers and analysts to access datasets that would otherwise be unavailable.
+
+This repository provides a framework to:
+- Access and process *historical* data on political or commercial ad targeting.
+- Retrieve targeting data by country, timeframe, and targeting criteria.
+- Automate workflows for downloading and storing target audiences for the predefined periods (7, 30, or 90 days) and preserving this data for long-term analysis.
+
+It integrates with the [`metatargetr`](https://github.com/favstats/metatargetr) package to fetch audience targeting data directly from Meta's GitHub releases.
+
+## Key Features
+- **Automated Data Retrieval:** `get_targeting_db` from [`metatargetr`](https://github.com/favstats/metatargetr) package enables easy access to targeting datasets stored as `.parquet` files on GitHub.
+
+- **Support for Multiple Countries:** Retrieve data across a wide range of countries using their ISO codes.
+
+- **Custom Timeframes:** Specify timeframes (e.g., `LAST_30_DAYS`) to tailor the analysis to specific periods.
+
+- **Data Cleaning and Integration:** Seamlessly combines data from different sources, such as Meta's reports and the [PartyFacts](https://partyfacts.herokuapp.com/) database, into one unified dataset.
+
+## Example Use Case
+A typical workflow might involve:
+
+1. Specifying a country (e.g., "DE" for Germany) and timeframe (e.g., last 30 days) as well as from which date it should count (ds = "2024-10-25").
+
+2. Using the `get_targeting_db` function to fetch the latest targeting data:
+   ```r
+   latest_data <- get_targeting_db(the_cntry = "DE", tf = 30, ds = "2024-10-25")
+   ```
+   
+---
+
+## Citing `metatargetr`
+
+If you use the `metatargetr` package or data from its database in your research, publications, or other outputs, please ensure you provide proper attribution. This helps recognize the effort and resources required to maintain and provide access to these data.
+
+### Citation Format
+
+> 	Votta, Fabio, & Mendoza, Philipp. (2024). `metatargetr`: A package for parsing and analyzing ad library and targeting data. GitHub. Available at: https://github.com/favstats/metatargetr
+
+### BibTeX Entry
+
+```bibtex
+@misc{votta2024metatargetr,
+  author = {Votta, Fabio and Mendoza, Philipp},
+  title = {metatargetr: A package for parsing and analyzing ad library and targeting data},
+  year = {2024},
+  publisher = {GitHub},
+  url = {https://github.com/favstats/metatargetr}
+}
+```
+
+### Additional Notes
+
+If you use data from the `metatargetr` database, please include the following acknowledgement in your work:
+
+> Data were retrieved from the `metatargetr` database, maintained by Fabio Votta. The database archives targeting data from the Meta Ad Library and Google Transparency Report. For more information, visit https://github.com/favstats/metatargetr.
+
+By including these citations and acknowledgements, you help support the continued development of `metatargetr` and its associated resources. Thank you for your collaboration! 
+
+---
