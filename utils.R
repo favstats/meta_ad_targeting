@@ -809,7 +809,7 @@ get_page_insights <- function (pageid, timeframe = "LAST_30_DAYS", lang = "en-GB
     
   ips_targeting <- readr::read_lines("data/ips-targeting.txt")
     
-  })
+  }, silent = T)
   
   prx <- sample(ips_targeting, 1)
   prxs <- stringr::str_split(prx, "(?<=\\d)\\:", n = 2)

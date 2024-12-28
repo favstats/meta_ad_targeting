@@ -247,7 +247,37 @@ try({
   # jb <-
     # get_page_insights("23216224900", timeframe = glue::glue("LAST_90_DAYS"), include_info = "targeting_info", proxy = F)
   
-  new_ds <- jb %>% arrange(ds) %>% slice(1) %>% pull(ds)
+  
+  for (i in 1:length(togetstuff$page_id)) {
+    # Get insights for the current page ID
+    jb <- get_page_insights(
+      togetstuff$page_id[i], 
+      timeframe = glue::glue("LAST_90_DAYS"), 
+      include_info = "targeting_info"
+    )
+    
+    # Check if `jb` is not NULL
+    if (!is.null(jb)) {
+      # print("is not null")
+      if(nrow(jb) == 0){
+        # print("but is zero")
+        next
+      } else {
+        # Extract the `new_ds` value
+        new_ds <- jb %>% 
+          arrange(ds) %>% 
+          slice(1) %>% 
+          pull(ds)
+        
+        # Break the loop if `new_ds` is successfully assigned
+        if (!is.null(new_ds)) {
+          # message("New `ds` found, breaking the loop.")
+          break
+        }
+        
+      }
+    } 
+  }
   # new_ds <- "2023-01-01"
   
   print("################ LATEST TARGETING DATA ################")
