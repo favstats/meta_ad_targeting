@@ -1,4 +1,9 @@
-# Meta Ad Targeting Database
+---
+output: github_document
+---
+
+
+# Meta Ad Targeting Database <img src="https://favstats.github.io/metatargetr/reference/figures/metatargetr_logo.png" width="160px" align="right"/>
 
 This repository is designed to streamline the retrieval and processing of targeting data from Meta's advertising platform. The hope is that this tool is useful for researchers, analysts, and organizations seeking to understand ad targeting strategies across different countries and timeframes. 
 
