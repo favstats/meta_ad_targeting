@@ -139,12 +139,15 @@ try({
   unlink("targeting", recursive = T, force = T)
   unlink("historic", recursive = T, force = T)
   
+  try({
+    
   # Step 3: Decrypt the file and read content
   decrypted_content <- decrypt_file("data/ips-targeting.enc")
   ips_targeting <- str_split(decrypted_content, "\n", simplify = F)
-  
+
   ips_targeting <- unlist(ips_targeting)[-1:-2]
-  
+  })
+  # 
   print("################ CHECK LATEST REPORT ################")
   
   
@@ -240,6 +243,9 @@ try({
   # library(stringr)
   jb <-
     get_page_insights(togetstuff$page_id[1], timeframe = glue::glue("LAST_90_DAYS"), include_info = "targeting_info")
+  
+  # jb <-
+    # get_page_insights("23216224900", timeframe = glue::glue("LAST_90_DAYS"), include_info = "targeting_info", proxy = F)
   
   new_ds <- jb %>% arrange(ds) %>% slice(1) %>% pull(ds)
   # new_ds <- "2023-01-01"

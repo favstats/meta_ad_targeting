@@ -787,11 +787,29 @@ get_proxy_user <- function(prxs) {
 }
 
 
+# Initialize a global counter in the environment
+if (!exists("consecutive_error_count", envir = .GlobalEnv)) {
+  assign("consecutive_error_count", 0, envir = .GlobalEnv)
+}
+
 get_page_insights <- function (pageid, timeframe = "LAST_30_DAYS", lang = "en-GB",
                                iso2c = "US", include_info = c("page_info", "targeting_info"),
-                               join_info = T)
+                               join_info = T, proxy = T, max_consecutive_errors = 5)
 {
   
+  
+  # Terminate R session if the maximum error count is reached
+  if (consecutive_error_count >= max_consecutive_errors) {
+    # message("Max consecutive errors reached. Exiting session.")
+    return(tibble())
+  }
+  
+  
+  try({
+    
+  ips_targeting <- readr::read_lines("data/ips-targeting.txt")
+    
+  })
   
   prx <- sample(ips_targeting, 1)
   prxs <- stringr::str_split(prx, "(?<=\\d)\\:", n = 2)
@@ -800,44 +818,147 @@ get_page_insights <- function (pageid, timeframe = "LAST_30_DAYS", lang = "en-GB
   ua_list <- c("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36",
                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36")
+  
   ua <- sample(ua_list, 1)
-  resp <- request("https://www.facebook.com/api/graphql/") %>%
-    req_headers(`Accept-Language` = paste0(lang, ",", stringr::str_split(lang,
-                                                                         "-") %>% unlist() %>% .[1], ";q=0.5"), `sec-fetch-site` = "same-origin",
-                `user-agent` = ua) %>% 
-    req_body_raw(glue::glue("av=0&_aaid=0&user=0&a=1&req=3&hs=19797.BP%3ADEFAULT.2.0..0.0&dpr=1&ccg=EXCELLENT&rev=1012093869&s=sbbnic%3Awquopy%3A7r1j3c&hsi=7346737420686302672&dyn=7xe6Eiw_K9zo5ObwKBAgc9o2exu13wqojyUW3qi4EoxW4E7SewXwCwfW7oqx60Vo1upEK12wvk1bwbG78b87C2m3K2y11wBw5Zx62G3i1ywdl0Fw4Hwp8kwyx2cU8EmwoHwrUcUjwVw9O7bK2S2W2K4EG1Mxu16wciaw4JwJwSyES0gq0K-1LwqobU2cwmo6O1Fw44wt8&csr=&lsd=AVo6-wl7l1Q&jazoest=2881&spin_r=1012093869&spin_b=trunk&spin_t=1710545602&_jssesw=1&fb_api_caller_class=RelayModern&fb_api_req_friendly_name=AdLibraryMobileFocusedStateProviderQuery&variables=%7B%22adType%22%3A%22POLITICAL_AND_ISSUE_ADS%22%2C%22audienceTimeframe%22%3A%22{timeframe}%22%2C%22country%22%3A%22{iso2c}%22%2C%22viewAllPageID%22%3A%22{pageid}%22%2C%22fetchPageInfo%22%3Atrue%2C%22fetchSharedDisclaimers%22%3Atrue%2C%22active_status%22%3A%22ALL%22%2C%22ad_type%22%3A%22POLITICAL_AND_ISSUE_ADS%22%2C%22bylines%22%3A%5B%5D%2C%22collation_token%22%3A%227ca3912f-0148-43ce-83e4-9a68ef656e4d%22%2C%22content_languages%22%3A%5B%5D%2C%22count%22%3A30%2C%22countries%22%3A%5B%22{iso2c}%22%5D%2C%22excluded_ids%22%3A%5B%5D%2C%22full_text_search_field%22%3A%22ALL%22%2C%22group_by_modes%22%3A%5B%5D%2C%22image_id%22%3Anull%2C%22location%22%3Anull%2C%22media_type%22%3A%22ALL%22%2C%22page_ids%22%3A%5B%5D%2C%22pagination_mode%22%3Anull%2C%22potential_reach_input%22%3Anull%2C%22publisher_platforms%22%3A%5B%5D%2C%22query_string%22%3A%22%22%2C%22regions%22%3A%5B%5D%2C%22search_type%22%3A%22PAGE%22%2C%22session_id%22%3A%221678877b-700b-485a-abb0-60efcb6b4019%22%2C%22sort_data%22%3A%7B%22mode%22%3A%22SORT_BY_RELEVANCY_MONTHLY_GROUPED%22%2C%22direction%22%3A%22ASCENDING%22%7D%2C%22source%22%3Anull%2C%22start_date%22%3Anull%2C%22view_all_page_id%22%3A%22{pageid}%22%7D&server_timestamps=true&doc_id=7193625857423421"),
-                                                    "application/x-www-form-urlencoded") %>% req_perform()
-  out <- resp %>% httr2::resp_body_html() %>% rvest::html_element("p") %>%
-    rvest::html_text() %>% str_split_1("(?<=\\})\\s*(?=\\{)") %>%
-    map(jsonlite::fromJSON)
-  if (!is.null(out[[1]][["errors"]][["description"]])) {
-    message(out[[1]][["errors"]][["description"]])
+  
+  if(!proxy){
     
     
-    # fetch_page_info <- ifelse("page_info" %in% include_info, 
-    #                           "true", "false")
-    # 
-    # 
-    # 
-    # resp <- httr2::request("https://www.facebook.com/api/graphql/") %>% 
-    #   httr2::req_headers(`Accept-Language` = paste0(lang, 
-    #                                                 ",", stringr::str_split(lang, "-") %>% unlist() %>% 
-    #                                                   .[1], ";q=0.5"), `sec-fetch-site` = "same-origin", 
-    #                      `user-agent` = ua) %>%
-    #   httr2::req_proxy(
-    #     url = get_proxy(prxs)[1],
-    #     port = as.numeric(get_proxy(prxs)[2]),
-    #     username = get_proxy_user(prxs)[1],
-    #     password = get_proxy_user(prxs)[2]
-    #   ) %>%
-    #   httr2::req_body_raw(glue::glue("av=0&_aaid=0&user=0&a=1&req=3&hs=19797.BP%3ADEFAULT.2.0..0.0&dpr=1&ccg=EXCELLENT&rev=1012093869&s=sbbnic%3Awquopy%3A7r1j3c&hsi=7346737420686302672&dyn=7xe6Eiw_K9zo5ObwKBAgc9o2exu13wqojyUW3qi4EoxW4E7SewXwCwfW7oqx60Vo1upEK12wvk1bwbG78b87C2m3K2y11wBw5Zx62G3i1ywdl0Fw4Hwp8kwyx2cU8EmwoHwrUcUjwVw9O7bK2S2W2K4EG1Mxu16wciaw4JwJwSyES0gq0K-1LwqobU2cwmo6O1Fw44wt8&csr=&lsd=AVo6-wl7l1Q&jazoest=2881&spin_r=1012093869&spin_b=trunk&spin_t=1710545602&_jssesw=1&fb_api_caller_class=RelayModern&fb_api_req_friendly_name=AdLibraryMobileFocusedStateProviderQuery&variables=%7B%22adType%22%3A%22POLITICAL_AND_ISSUE_ADS%22%2C%22audienceTimeframe%22%3A%22{timeframe}%22%2C%22country%22%3A%22{iso2c}%22%2C%22viewAllPageID%22%3A%22{pageid}%22%2C%22fetchPageInfo%22%3A{fetch_page_info}%2C%22fetchSharedDisclaimers%22%3Atrue%2C%22active_status%22%3A%22ALL%22%2C%22ad_type%22%3A%22POLITICAL_AND_ISSUE_ADS%22%2C%22bylines%22%3A%5B%5D%2C%22collation_token%22%3A%227ca3912f-0148-43ce-83e4-9a68ef656e4d%22%2C%22content_languages%22%3A%5B%5D%2C%22count%22%3A30%2C%22countries%22%3A%5B%22{iso2c}%22%5D%2C%22excluded_ids%22%3A%5B%5D%2C%22full_text_search_field%22%3A%22ALL%22%2C%22group_by_modes%22%3A%5B%5D%2C%22image_id%22%3Anull%2C%22location%22%3Anull%2C%22media_type%22%3A%22ALL%22%2C%22page_ids%22%3A%5B%5D%2C%22pagination_mode%22%3Anull%2C%22potential_reach_input%22%3Anull%2C%22publisher_platforms%22%3A%5B%5D%2C%22query_string%22%3A%22%22%2C%22regions%22%3A%5B%5D%2C%22search_type%22%3A%22PAGE%22%2C%22session_id%22%3A%221678877b-700b-485a-abb0-60efcb6b4019%22%2C%22sort_data%22%3A%7B%22mode%22%3A%22SORT_BY_RELEVANCY_MONTHLY_GROUPED%22%2C%22direction%22%3A%22ASCENDING%22%7D%2C%22source%22%3Anull%2C%22start_date%22%3Anull%2C%22view_all_page_id%22%3A%22{pageid}%22%7D&server_timestamps=true&doc_id=7193625857423421"), 
-    #                       "application/x-www-form-urlencoded") %>% 
-    #   httr2::req_perform()
-    # out <- resp %>% httr2::resp_body_html() %>% rvest::html_element("p") %>% 
-    #   rvest::html_text() %>% str_split_1("(?<=\\})\\s*(?=\\{)") %>% 
-    #   map(jsonlite::fromJSON)
+    resp <- request("https://www.facebook.com/api/graphql/") %>%
+      req_headers(`Accept-Language` = paste0(lang, ",", stringr::str_split(lang,
+                                                                           "-") %>% unlist() %>% .[1], ";q=0.5"), `sec-fetch-site` = "same-origin",
+                  `user-agent` = ua) %>% 
+      req_body_raw(glue::glue("av=0&_aaid=0&user=0&a=1&req=3&hs=19797.BP%3ADEFAULT.2.0..0.0&dpr=1&ccg=EXCELLENT&rev=1012093869&s=sbbnic%3Awquopy%3A7r1j3c&hsi=7346737420686302672&dyn=7xe6Eiw_K9zo5ObwKBAgc9o2exu13wqojyUW3qi4EoxW4E7SewXwCwfW7oqx60Vo1upEK12wvk1bwbG78b87C2m3K2y11wBw5Zx62G3i1ywdl0Fw4Hwp8kwyx2cU8EmwoHwrUcUjwVw9O7bK2S2W2K4EG1Mxu16wciaw4JwJwSyES0gq0K-1LwqobU2cwmo6O1Fw44wt8&csr=&lsd=AVo6-wl7l1Q&jazoest=2881&spin_r=1012093869&spin_b=trunk&spin_t=1710545602&_jssesw=1&fb_api_caller_class=RelayModern&fb_api_req_friendly_name=AdLibraryMobileFocusedStateProviderQuery&variables=%7B%22adType%22%3A%22POLITICAL_AND_ISSUE_ADS%22%2C%22audienceTimeframe%22%3A%22{timeframe}%22%2C%22country%22%3A%22{iso2c}%22%2C%22viewAllPageID%22%3A%22{pageid}%22%2C%22fetchPageInfo%22%3Atrue%2C%22fetchSharedDisclaimers%22%3Atrue%2C%22active_status%22%3A%22ALL%22%2C%22ad_type%22%3A%22POLITICAL_AND_ISSUE_ADS%22%2C%22bylines%22%3A%5B%5D%2C%22collation_token%22%3A%227ca3912f-0148-43ce-83e4-9a68ef656e4d%22%2C%22content_languages%22%3A%5B%5D%2C%22count%22%3A30%2C%22countries%22%3A%5B%22{iso2c}%22%5D%2C%22excluded_ids%22%3A%5B%5D%2C%22full_text_search_field%22%3A%22ALL%22%2C%22group_by_modes%22%3A%5B%5D%2C%22image_id%22%3Anull%2C%22location%22%3Anull%2C%22media_type%22%3A%22ALL%22%2C%22page_ids%22%3A%5B%5D%2C%22pagination_mode%22%3Anull%2C%22potential_reach_input%22%3Anull%2C%22publisher_platforms%22%3A%5B%5D%2C%22query_string%22%3A%22%22%2C%22regions%22%3A%5B%5D%2C%22search_type%22%3A%22PAGE%22%2C%22session_id%22%3A%221678877b-700b-485a-abb0-60efcb6b4019%22%2C%22sort_data%22%3A%7B%22mode%22%3A%22SORT_BY_RELEVANCY_MONTHLY_GROUPED%22%2C%22direction%22%3A%22ASCENDING%22%7D%2C%22source%22%3Anull%2C%22start_date%22%3Anull%2C%22view_all_page_id%22%3A%22{pageid}%22%7D&server_timestamps=true&doc_id=7193625857423421"),
+                   "application/x-www-form-urlencoded") %>% req_perform()
+    out <- resp %>% httr2::resp_body_html() %>% rvest::html_element("p") %>%
+      rvest::html_text() %>% str_split_1("(?<=\\})\\s*(?=\\{)") %>%
+      map(jsonlite::fromJSON)
     
+    if (!is.null(out[[1]][["errors"]][["description"]])) {
+      message(out[[1]][["errors"]][["description"]])
+      # Increment global error counter
+      consecutive_error_count <- get("consecutive_error_count", envir = .GlobalEnv)
+      consecutive_error_count <- consecutive_error_count + 1
+      assign("consecutive_error_count", consecutive_error_count, envir = .GlobalEnv)
+      
+      message(sprintf("Encountered error %d/%d: %s", 
+                      consecutive_error_count, max_consecutive_errors, 
+                      out[[1]][["errors"]][["description"]]))
+      
+      
+      # Return early or continue logic if needed
+      return(NULL)
+      # stop("empty")
+    }
+    
+  } else if (proxy) {
+  
+
+    
+    if("page_info" %in% include_info ){
+      include_page_info <- T
+    } else {
+      include_page_info <- F
+      
+    }
+    
+    ua <- sample(ua_list, 1)
+    # print(ua)
+    
+    # Define static parameters
+    static_params <- list(
+      av = "0",                        # Likely application version; may not change often. Optional.
+      "_aaid" = "0",                   # Anonymous Advertising ID; unique to the visitor. Required for tracking purposes.
+      user = "0",                      # User identifier; likely session-based or placeholder. Required.
+      a = "1",                         # Arbitrary request parameter; purpose unclear but likely required.
+      req = "3",                       # Request parameter; often a sequence or batch request identifier. Likely required.
+      hs = "19797.BP%3ADEFAULT.2.0..0.0", # Host session or configuration metadata; required for server-side routing.
+      ccg = "EXCELLENT",               # Connection grade; describes network quality. Optional but useful for server-side optimizations.
+      csr = "",                        # CSRF token; placeholder here, likely required in some contexts.
+      `_jssesw` = "1",                 # Encoded session value. Required for session management.
+      fb_api_caller_class = "RelayModern", # API metadata describing the client. Required.
+      fb_api_req_friendly_name = "AdLibraryMobileFocusedStateProviderQuery", # API-friendly name for request logging. Optional.
+      server_timestamps = "true",      # Flag indicating server timestamps should be included. Likely required.
+      doc_id = "7193625857423421"      # Unique document ID for the query. Required for identifying the request schema.
+    )
+    
+    # Construct variables
+    variables <- jsonlite::toJSON(
+      list(
+        adType = "POLITICAL_AND_ISSUE_ADS",      # Type of ads to query. Required.
+        audienceTimeframe = timeframe,          # Timeframe for audience data (e.g., LAST_30_DAYS). Required.
+        country = iso2c,                        # Country ISO code (e.g., "DE"). Required.
+        viewAllPageID = pageid,                 # Page ID for which data is being queried. Required.
+        fetchPageInfo = include_page_info,      # Boolean flag to fetch page-specific information. Optional.
+        fetchSharedDisclaimers = TRUE,          # Boolean flag to include shared disclaimers. Optional but useful.
+        active_status = "ALL",                  # Filter for active/inactive ads. Required.
+        ad_type = "POLITICAL_AND_ISSUE_ADS",    # Type of ads (repeated for clarity). Required.
+        bylines = list(),                       # List of bylines to filter ads. Optional.
+        content_languages = list(),             # Filter for content languages. Optional.
+        count = 30,                             # Number of results to fetch. Optional but usually required for pagination.
+        countries = list(iso2c),                # List of countries for filtering (repeated for clarity). Required.
+        excluded_ids = list(),                  # IDs to exclude from results. Optional.
+        full_text_search_field = "ALL",         # Full-text search field filter. Optional.
+        group_by_modes = list(),                # Grouping modes for results. Optional.
+        search_type = "PAGE",                   # Type of search (e.g., by page). Required.
+        sort_data = list(
+          mode = "SORT_BY_RELEVANCY_MONTHLY_GROUPED", # Sorting mode. Required.
+          direction = "ASCENDING"                    # Sorting direction. Required.
+        )
+      ),
+      auto_unbox = TRUE
+    )
+    
+    static_params$variables <- URLencode(variables)
+    body <- paste(names(static_params), static_params, sep = "=", collapse = "&")
+    
+    # print("Constructed body:")
+    # print(body)
+    
+    resp <- httr2::request("https://www.facebook.com/api/graphql/") %>%
+      httr2::req_headers(
+        `Accept-Language` = paste0(
+          lang, ",", stringr::str_split(lang, "-") %>% unlist() %>% .[1], ";q=0.5"
+        ),
+        `sec-fetch-site` = "same-origin",
+        `user-agent` = ua
+      ) %>%
+      httr2::req_body_raw(body, "application/x-www-form-urlencoded") %>%
+        httr2::req_proxy(
+          url = get_proxy(prxs)[1],
+          port = as.numeric(get_proxy(prxs)[2]),
+          username = get_proxy_user(prxs)[1],
+          password = get_proxy_user(prxs)[2]
+        ) %>%
+      httr2::req_perform()
+    
+    out <- resp %>%
+      httr2::resp_body_html() %>%
+      rvest::html_element("p") %>%
+      rvest::html_text() %>%
+      stringr::str_split_1('(?<=\\})\\s*(?=\\{)') %>%
+      purrr::map(jsonlite::fromJSON)
+    
+    if (!is.null(out[[1]][["errors"]][["description"]])) {
+      message(out[[1]][["errors"]][["description"]])
+      # Increment global error counter
+      consecutive_error_count <- get("consecutive_error_count", envir = .GlobalEnv)
+      consecutive_error_count <- consecutive_error_count + 1
+      assign("consecutive_error_count", consecutive_error_count, envir = .GlobalEnv)
+      
+      message(sprintf("Encountered error %d/%d: %s", 
+                      consecutive_error_count, max_consecutive_errors, 
+                      out[[1]][["errors"]][["description"]]))
+      
+      
+      # Return early or continue logic if needed
+      return(NULL)
+    }
   }
+  
+  # Reset the global error counter on success
+  assign("consecutive_error_count", 0, envir = .GlobalEnv)
+  
   if ("page_info" %in% include_info) {
     page_info1 <- out[[1]][["data"]][["ad_library_page_info"]][["page_info"]]
     if (is.null(page_info1)) {
@@ -922,6 +1043,10 @@ get_page_insights <- function (pageid, timeframe = "LAST_30_DAYS", lang = "en-GB
   else if ("targeting_info" %in% include_info) {
     return(targeting_info)
   }
+  
+  # Reset the global error counter on success
+  assign("consecutive_error_count", 0, envir = .GlobalEnv)
+  
   return(fin)
 }
 
