@@ -700,6 +700,12 @@ try({
   
   print(file.exists(paste0(the_date, ".parquet")))
   
+  
+  if("no_data" %in% names(election_dat)){
+    election_dat <- election_dat %>% filter(is.na(no_data))
+  }
+  
+  
   if(!(identical(latest_elex, election_dat))){
     
     print("################ UPLOAD FILE ################")
