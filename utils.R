@@ -795,7 +795,7 @@ if (!exists("consecutive_error_count", envir = .GlobalEnv)) {
 
 get_page_insights <- function (pageid, timeframe = "LAST_30_DAYS", lang = "en-GB",
                                iso2c = "US", include_info = c("page_info", "targeting_info"),
-                               join_info = T, proxy = T, max_consecutive_errors = 5)
+                               join_info = T, proxy = F, max_consecutive_errors = 5)
 {
   
   
