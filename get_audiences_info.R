@@ -27,6 +27,15 @@ try({
   library(piggyback)
   # library(metatargetr)
   
+  try({
+    
+    # Step 3: Decrypt the file and read content
+    decrypted_content <- decrypt_file("data/ips-targeting.enc")
+    ips_targeting <- str_split(decrypted_content, "\n", simplify = F)
+    
+    ips_targeting <- unlist(ips_targeting)[-1:-2]
+  })
+  
   # sets <- jsonlite::fromJSON("settings.json")
   #
   # title_txt <- read_lines("_site/_quarto.yml")
@@ -51,144 +60,21 @@ try({
   
   # full_cntry_list$iso2c %>% dput()
   
-  if (Sys.info()[["effective_user"]] == "favoo") {
+  if (Sys.info()[["effective_user"]] %in% c("fabio", "favstats")) {
     ### CHANGE ME WHEN LOCAL!
     tf <- "30"
-    sets$cntry <- "DE"
+    sets$cntry <- "HR"
     print(paste0("TF: ", tf))
     print(paste0("cntry: ", sets))
     
   }
   
-  # loop_it <- T
   targeting <- F
-  # if(loop_it){
-  #   
-  # }
-  
-  # for (cntryy in full_cntry_list$iso2c) {
-  #   sets$cntry <-  cntryy
-  #   print(sets$cntry)
-  # #
-  #   if(!exists("rate_limit")){
-  #     rate_limit <<- F
-  #   } else {
-  # 
-  #     if(length(rate_limit)==0)  rate_limit <<- F
-  # 
-  #   }
-  #   if(rate_limit){
-  #     break
-  #   }
+
   
   unlink("targeting", recursive = T, force = T)
   unlink("historic", recursive = T, force = T)
   unlink("info", recursive = T, force = T)
-  
-  # if()
-  
-  
-  # jb <-
-  #   get_page_insights("7860876103", timeframe = glue::glue("LAST_90_DAYS"))
-  
-  jb <-
-    get_page_insights("7860876103", timeframe = glue::glue("LAST_90_DAYS"), include_info = "targeting_info")
-  
-  new_ds <- jb %>% arrange(ds) %>% slice(1) %>% pull(ds)
-  # new_ds <- "2023-01-01"
-  
-  print("################ LATEST TARGETING DATA ################")
-  
-  try({
-    # latest_elex <- readRDS(paste0("data/election_dat", tf, ".rds"))
-    
-    out <- sets$cntry %>%
-      map( ~ {
-        .x %>%
-          paste0(c("-last_7_days", "-last_30_days",
-                   "-last_90_days"))
-      }) %>%
-      unlist() %>%
-      keep( ~ str_detect(.x, tf)) %>%
-      # .[100:120] %>%
-      map_dfr( ~ {
-        the_assets <-
-          httr::GET(
-            paste0(
-              "https://github.com/favstats/meta_ad_targeting/releases/expanded_assets/",
-              .x
-            )
-          )
-        
-        the_assets %>% httr::content() %>%
-          html_elements(".Box-row") %>%
-          html_text()  %>%
-          tibble(raw = .)   %>%
-          # Split the raw column into separate lines
-          mutate(raw = strsplit(as.character(raw), "\n")) %>%
-          # Extract the relevant lines for filename, file size, and timestamp
-          transmute(
-            filename = sapply(raw, function(x)
-              trimws(x[3])),
-            file_size = sapply(raw, function(x)
-              trimws(x[6])),
-            timestamp = sapply(raw, function(x)
-              trimws(x[7]))
-          ) %>%
-          filter(filename != "Source code") %>%
-          mutate(release = .x) %>%
-          mutate_all(as.character)
-      })
-    
-    thosearethere <- out %>%
-      rename(tag = release,
-             file_name = filename) %>%
-      arrange(desc(tag)) %>%
-      separate(
-        tag,
-        into = c("cntry", "tframe"),
-        remove = F,
-        sep = "-"
-      ) %>%
-      mutate(ds  = str_remove(file_name, "\\.rds|\\.zip|\\.parquet")) %>%
-      distinct(cntry, ds, tframe) %>%
-      drop_na(ds) %>%
-      arrange(desc(ds))
-    
-    try({
-      latest_elex <-
-        arrow::read_parquet(
-          paste0(
-            "https://github.com/favstats/meta_ad_targeting/releases/download/",
-            sets$cntry,
-            "-last_",
-            tf,
-            "_days/",
-            thosearethere$ds[1],
-            ".parquet"
-          )
-        )
-    })
-    
-    if (!exists("latest_elex")) {
-      latest_elex <- tibble()
-    }
-    
-    if (!("ds" %in% names(latest_elex))) {
-      latest_elex <- latest_elex %>% mutate(ds = "")
-    }
-    
-    latest_ds <- thosearethere$ds[1]
-    
-  })
-  
-  
-  if (!exists("latest_ds")) {
-    latest_ds <- "2023-01-01"
-  } else if (is.na(latest_ds)) {
-    latest_ds <- "2023-01-01"
-  }
-  
   
   tstamp <- Sys.time()
   
@@ -372,36 +258,11 @@ try({
     
     if(nrow(.x)==0) return(tibble(targeting_info = NULL, page_info = NULL))
     
-    raw_resp <- get_page_insights(.x$page_id, timeframe = glue::glue("LAST_{time}_DAYS"), iso2c = sets$cntry, join_info = F) 
-    
-    fin <- raw_resp %>%
-      .[[2]] %>% 
-      mutate(tstamp = tstamp) %>% 
-      rename(internal_id = page_id)
+    raw_resp <- get_page_insights(.x$page_id, include_info = "page_info") 
     
     fin2 <- raw_resp %>%
-      .[[1]] %>% 
       mutate(tstamp = tstamp)
-    
-    if (nrow(fin) != 0) {
-      if (!dir.exists(glue::glue("targeting/{time}"))) {
-        dir.create(glue::glue("targeting/{time}"), recursive = T)
-      }
-      
-      path <-
-        paste0(glue::glue("targeting/{time}/"), .x$page_id, ".rds")
-      # if(file.exists(path)){
-      #   ol <- read_rds(path)
-      #
-      #   saveRDS(fin %>% bind_rows(ol), file = path)
-      # } else {
-      
-      saveRDS(fin, file = path)
-      # }
-    } else {
-      fin <- tibble(internal_id = .x$page_id, no_data = T) %>%
-        mutate(tstamp = tstamp)
-    }
+          # }
     
     if (nrow(fin2) != 0) {
       if (!dir.exists(glue::glue("info"))) {
@@ -410,11 +271,7 @@ try({
       
       path <-
         paste0(glue::glue("info/"), .x$page_id, ".rds")
-      # if(file.exists(path)){
-      #   ol <- read_rds(path)
-      #
-      #   saveRDS(fin %>% bind_rows(ol), file = path)
-      # } else {
+      
       
       saveRDS(fin2, file = path)
       # }
@@ -424,28 +281,22 @@ try({
     }
     
     
-    # c("page_info", "targeting_info")
-    # print(nrow(fin))
-    # })
-    return(list(page_info = fin2, targeting_info = fin))
+    return(list(page_info = fin2))
     
   }
   
   scraper <- possibly(scraper, otherwise = NULL, quiet = F)
   
   
-  print("################ RETRIEVE AUDIENCES ################")
+  print("################ RETRIEVE PAGE INFO ################")
   try({
     old_info <- arrow::read_parquet(glue::glue("https://github.com/favstats/meta_ad_targeting/releases/download/PageInfo/{sets$cntry}-page_info.parquet"))
   })
   if(!exists("old_info")){
     old_info <- tibble()
   }
-  # if(F){
-  #     # dir("provincies/7", full.names
-  # }
-  # da30 <- readRDS("data/election_dat30.rds")
-  # da7 <- readRDS("data/election_dat7.rds")
+
+  
   try({
     
     current_date <-
@@ -456,95 +307,13 @@ try({
              tf,
              "_days")
     
-    # all_dat <- all_dat %>% slice(1)
-    # targeting <- T
-    if(targeting){
-      
-      if (new_ds == latest_ds) {
-        ### if we are still in the same period
-        print(glue::glue("New DS: {new_ds}: Old DS: {latest_ds}"))
-        # debugonce(get_page_insights)
-        
-        ### save seperately
-        benny <- all_dat %>%
-          arrange(page_id) %>%
-          # slice(1:10) %>%
-          # filter(!(page_id %in% latest_elex$page_id))  %>%
-          filter(page_id %in% last7$page_id) %>%
-          split(1:nrow(.)) %>%
-          map(scraper)
-        
-        enddat <- benny %>% map_dfr(~pluck(.x, "targeting_info")) %>% as_tibble()
-        
-        
-        if (nrow(enddat) == 0) {
-          ## no new data
-          election_dat <- latest_elex
-          
-          dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
-          
-          
-          arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
-          
-          
-        } else {
-          ## new data so we need to bind it
-          print(glue::glue("New DS: {new_ds}: Old DS: {latest_ds} 2"))
-          
-          
-          election_dat  <- enddat %>%
-            mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) %>%
-            rename(page_id = internal_id) %>%
-            left_join(all_dat) %>%
-            bind_rows(latest_elex) %>%
-            distinct()
-          
-          dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
-          
-          
-          arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
-          
-          # arrow::read_parquet(paste0(current_date, ".parquet")) %>% View()
-          
-          # saveRDS(election_dat, file = paste0(current_date, ".rds"))
-        }
-        
-        
-      } else {
-        
-        ### save seperately
-        benny <- all_dat %>%
-          arrange(page_id) %>%
-          split(1:nrow(.)) %>%
-          map(scraper)
-        
-        enddat <- benny %>% map_dfr(~pluck(.x, "targeting_info")) %>% as_tibble()
-        
-        # infodat <- benny %>% map_dfr(~pluck(.x, "page_info")) %>% as_tibble()
-        
-        
-        election_dat <- enddat %>%
-          mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) %>%
-          rename(page_id = internal_id)  %>%
-          left_join(all_dat)
-        
-        dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
-        
-        
-        arrow::write_parquet(election_dat, paste0(current_date, ".parquet"))
-        
-        # arrow::write_parquet(infodat, paste0(sets$cntry,"-page_info", ".parquet"))
-      }
-      
-    } else {
-      # cntry_name
       ### save seperately
       benny <- all_dat %>%
         arrange(page_id) %>%
-        # sample_n(30) %>%
+        # sample_n(5) %>%
         split(1:nrow(.)) %>%
         map_progress(scraper)
-    }
+  
     
   })
   # saveRDS(election_dat, paste0("data/election_dat", tf, ".rds"))
@@ -556,8 +325,7 @@ try({
   # sources("start.R")
   
   the_tag <- paste0(sets$cntry, "-", "last_", tf, "_days")
-  the_date <- new_ds
-  
+
   # full_repos
   
   
@@ -572,7 +340,8 @@ try({
   try({
     infodat <- infodat %>% 
       bind_rows(old_info) %>% 
-      distinct(page_name, about, likes, .keep_all = T)      
+      distinct(page_name, about, likes, .keep_all = T) %>% 
+      drop_na(page_id)
   })
   
   
@@ -592,28 +361,6 @@ try({
     filter(iso2c == sets$cntry) %>%
     pull(country)
   
-  if(!(the_tag %in% releases$tag_name)){
-    try({
-      pb_release_create_fr(
-        repo = "favstats/meta_ad_targeting",
-        tag = the_tag,
-        body = paste0(
-          "This release includes ",
-          cntry_name , " '", "last_", tf, "_days" , "' Meta ad target audiences."
-        ),
-        releases = releases
-      )    # Sys.sleep(5)
-    })
-  }
-  
-  
-  file.copy(paste0(current_date, ".parquet"),
-            paste0(the_date, ".parquet"),
-            overwrite = T)
-  
-  print(file.exists(paste0(the_date, ".parquet")))
-  
-
   if(nrow(infodat)!=0){
     if(!(identical(old_info, infodat))){
       
@@ -644,7 +391,6 @@ try({
   
   
   
-  file.remove(paste0(the_date, ".parquet"))
   file.remove(paste0(sets$cntry,"-page_info", ".parquet"))
   rm(old_info)
   
