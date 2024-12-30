@@ -288,6 +288,7 @@ try({
   scraper <- possibly(scraper, otherwise = NULL, quiet = F)
   
   
+  
   print("################ RETRIEVE PAGE INFO ################")
   try({
     old_info <- arrow::read_parquet(glue::glue("https://github.com/favstats/meta_ad_targeting/releases/download/PageInfo/{sets$cntry}-page_info.parquet"))
@@ -295,26 +296,28 @@ try({
   if(!exists("old_info")){
     old_info <- tibble()
   }
-
+  
   
   try({
+    # Retrieve existing data for the current day
+    current_date <- lubridate::today()
+    existing_page_ids <- old_info %>%
+      filter(lubridate::as_date(tstamp) == current_date) %>%
+      pull(page_id)
     
-    current_date <-
-      paste0("historic/",
-             as.character(new_ds),
-             "/",
-             "last_",
-             tf,
-             "_days")
+    # Filter out page IDs that are already present for the current day
+    pages_to_retrieve <- all_dat %>%
+      filter(!page_id %in% existing_page_ids)
     
-      ### save seperately
-      benny <- all_dat %>%
+    if (nrow(pages_to_retrieve) == 0) {
+      message("No new pages to retrieve for the current day.")
+    } else {
+      # Use only the filtered pages for scraping
+      benny <- pages_to_retrieve %>%
         arrange(page_id) %>%
-        # sample_n(5) %>%
         split(1:nrow(.)) %>%
         map_progress(scraper)
-  
-    
+    }
   })
   # saveRDS(election_dat, paste0("data/election_dat", tf, ".rds"))
   
@@ -325,7 +328,7 @@ try({
   # sources("start.R")
   
   the_tag <- paste0(sets$cntry, "-", "last_", tf, "_days")
-
+  
   # full_repos
   
   
@@ -336,6 +339,12 @@ try({
   # glimpse(old_info)
   infodat <- benny %>% map_dfr(~pluck(.x, "page_info")) %>% as_tibble()
   
+  try({
+    old_info <- arrow::read_parquet(glue::glue("https://github.com/favstats/meta_ad_targeting/releases/download/PageInfo/{sets$cntry}-page_info.parquet"))
+  })
+  if(!exists("old_info")){
+    old_info <- tibble()
+  }
   
   try({
     infodat <- infodat %>% 
@@ -350,16 +359,13 @@ try({
   
   ### TODO: get previous info
   arrow::write_parquet(infodat, paste0(sets$cntry,"-page_info", ".parquet"))
-  # reeeleases <- get_full_release()
-  # releeasee <- get_full_release()
-  # releasess <- get_full_release()
-  # releasesss <- piggyback::pb_releases()
-  # saveRDS(releasesss, file = "data/releases.rds")
+
   releases <- readRDS("data/releases.rds")
   
   cntry_name <- full_cntry_list %>%
     filter(iso2c == sets$cntry) %>%
     pull(country)
+  
   
   if(nrow(infodat)!=0){
     if(!(identical(old_info, infodat))){
