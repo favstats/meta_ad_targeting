@@ -36,6 +36,9 @@ try({
     ips_targeting <- unlist(ips_targeting)[-1:-2]
   })
   
+  if(!exists("ips_targeting")){
+    ips_targeting <- c("o")
+  }
   # sets <- jsonlite::fromJSON("settings.json")
   #
   # title_txt <- read_lines("_site/_quarto.yml")
