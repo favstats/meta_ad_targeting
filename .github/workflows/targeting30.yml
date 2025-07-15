@@ -38,6 +38,7 @@ jobs:
       ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
       TELEGRAM_BOT_ID: ${{ secrets.TELEGRAM_BOT_ID }}
       TELEGRAM_GROUP_ID: ${{ secrets.TELEGRAM_GROUP_ID }}
+      WHO_TARGETS_TOKEN: ${{ secrets.WHO_TARGETS_TOKEN }}
     steps:
       - name: Setup R
         uses: r-lib/actions/setup-r@v2

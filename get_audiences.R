@@ -3,6 +3,8 @@
 # rate_limit <<- F
 try({
   
+  source("https://raw.githubusercontent.com/favstats/metatargetr/refs/heads/master/R/get_ad_report.R")
+  
   if (!(Sys.info()[["effective_user"]] %in% c("fabio", "favstats"))) {
     remove.packages("arrow")
   }
@@ -437,12 +439,56 @@ try({
   
   
   if (the_cntry %in% country_codes & nrow(thedat) != 0) {
-    wtm_data <- read_csv("data/wtm_advertisers.csv") %>% #names
+    
+    
+    
+    library(httr)
+    
+    try({
+      
+      # thecntry <- "CA"
+      url <- "https://data-api.whotargets.me/advertisers-export-csv"
+      
+      token <- Sys.getenv("WHO_TARGETS_TOKEN")
+      
+      headers <- add_headers(
+        accept = "application/json",
+        `accept-language` = "en-US,en;q=0.9,de-DE;q=0.8,de;q=0.7,nl;q=0.6,it;q=0.5,sv;q=0.4,is;q=0.3",
+        # authorization = paste("Bearer", token),
+        `x-access-token` = token ,
+        `content-type` = "application/json",
+        priority = "u=1, i",
+        `sec-ch-ua` = '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
+        `sec-ch-ua-mobile` = "?0",
+        `sec-ch-ua-platform` = '"macOS"',
+        `sec-fetch-dest` = "empty",
+        `sec-fetch-mode` = "cors",
+        `sec-fetch-site` = "same-site"
+      )
+      
+      body <- list(
+        alpha2 = stringr::str_to_lower(the_cntry),
+        should_be_emailed = FALSE
+      )
+      
+      response <- POST(url, headers, body = body, encode = "json")
+      
+      # library(tidyverse)
+      
+      # vroom::vroom(url(content(response, "parsed")$url))
+      
+      download.file(content(response, "parsed")$url, destfile = "wtmdata.csv")
+      
+      
+    })
+    
+    wtm_data <- readr::read_csv("wtmdata.csv") %>% #names
       select(page_id = advertisers_platforms.advertiser_platform_ref,
              page_name = name,
              party = entities.short_name)  %>%
       mutate(page_id = as.character(page_id)) %>%
       mutate(sources = "wtm")
+    
     
   } else {
     wtm_data <-  tibble(no_data = T)
@@ -455,6 +501,13 @@ try({
     mutate(sources = "tep") %>%
     rename(party = name_short)
   
+  pacman::p_load(cli, janitor, vroom)
+  
+  # tf <- "LAST_7_DAYS"
+  # latest_ds <- "2025-07-10"
+  
+  ad_report <- get_ad_report(the_cntry, paste0("LAST_",tf,"_DAYS"), latest_ds)
+  
   
   all_dat <- #read_csv("nl_advertisers.csv") %>%
     # mutate(page_id = as.character(page_id)) %>%
@@ -462,6 +515,7 @@ try({
     bind_rows(wtm_data) %>%
     bind_rows(tep_dat) %>%
     bind_rows(last7) %>%
+    bind_rows(ad_report) %>%
     # bind_rows(rep) %>%
     # bind_rows(more_data %>% mutate(sources = "new")) %>%
     # bind_rows(groenams) %>%
