@@ -438,11 +438,11 @@ try({
   }
   
   
-  if (the_cntry %in% country_codes & nrow(thedat) != 0) {
+  # if (the_cntry %in% country_codes & nrow(thedat) != 0) {
+  
+  library(httr)
+    if (runif(1) < 1e-4 | Sys.info()["effective_user"] == "favstats") {
     
-    
-    
-    library(httr)
     
     try({
       
@@ -466,33 +466,56 @@ try({
         `sec-fetch-site` = "same-site"
       )
       
-      body <- list(
-        alpha2 = stringr::str_to_lower(the_cntry),
-        should_be_emailed = FALSE
-      )
+      wtm_data <- country_codes %>% 
+        map_dfr(~{
+          the_cntry <- .x
+          body <- list(
+            alpha2 = stringr::str_to_lower(the_cntry),
+            should_be_emailed = FALSE
+          )
+          
+          response <- POST(url, headers, body = body, encode = "json")
+          
+          # library(tidyverse)
+          
+          # vroom::vroom(url(content(response, "parsed")$url))
+          
+          download.file(content(response, "parsed")$url, destfile = "wtmdata.csv")
+          
+          print(the_cntry)
+          
+          if(nrow(readr::read_csv("wtmdata.csv")!=0 )){
+            wtm_data <- readr::read_csv("wtmdata.csv") %>% #names
+              select(page_id = advertisers_platforms.advertiser_platform_ref,
+                     page_name = name,
+                     party = entities.short_name)  %>%
+              mutate(page_id = as.character(page_id)) %>%
+              mutate(sources = "wtm") %>% 
+              mutate(cntry = the_cntry)
+            
+            return(wtm_data)       
+          }
+          
+
+          
+        })
       
-      response <- POST(url, headers, body = body, encode = "json")
-      
-      # library(tidyverse)
-      
-      # vroom::vroom(url(content(response, "parsed")$url))
-      
-      download.file(content(response, "parsed")$url, destfile = "wtmdata.csv")
+      write_csv(wtm_data, "data/wtm_advertisers.csv")
+
       
       
     })
     
-    wtm_data <- readr::read_csv("wtmdata.csv") %>% #names
-      select(page_id = advertisers_platforms.advertiser_platform_ref,
-             page_name = name,
-             party = entities.short_name)  %>%
-      mutate(page_id = as.character(page_id)) %>%
-      mutate(sources = "wtm")
+      
+    }
+
     
     
-  } else {
-    wtm_data <-  tibble(no_data = T)
-  }
+  # } else {
+    wtm_data <-  read_csv("data/wtm_advertisers.csv")
+  # }
+  
+  wtm_data <- wtm_data %>% filter(cntry == the_cntry)
   
   polsample <- readRDS("data/polsample.rds")
   
@@ -508,6 +531,8 @@ try({
   
   ad_report <- get_ad_report(the_cntry, paste0("LAST_",tf,"_DAYS"), latest_ds)
   
+  wtm_data %>% 
+    
   
   all_dat <- #read_csv("nl_advertisers.csv") %>%
     # mutate(page_id = as.character(page_id)) %>%
