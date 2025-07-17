@@ -238,34 +238,38 @@ try({
   
   pacman::p_load(cli, janitor, vroom)
   
-  install_from_github_zip <- function(repo, branch = "main") {
-    # Extract package name from repo string
+  install_from_github_zip <- function(repo) {
     pkg <- basename(repo)
-    
-    # Skip if already installed
     if (requireNamespace(pkg, quietly = TRUE)) {
       message(sprintf("✔ Package '%s' is already installed.", pkg))
       return(invisible(TRUE))
     }
     
-    # Build download URL
-    zip_url <- sprintf("https://github.com/%s/archive/refs/heads/%s.zip", repo, branch)
-    temp_file <- tempfile(fileext = ".zip")
-    temp_dir <- tempfile()
+    branches <- c("main", "master")
+    success <- FALSE
     
-    # Download and unzip
-    download.file(zip_url, destfile = temp_file, mode = "wb")
-    unzip(temp_file, exdir = temp_dir)
+    for (branch in branches) {
+      zip_url <- sprintf("https://github.com/%s/archive/refs/heads/%s.zip", repo, branch)
+      temp_file <- tempfile(fileext = ".zip")
+      temp_dir <- tempfile()
+      
+      message(sprintf("→ Trying branch '%s'...", branch))
+      try({
+        download.file(zip_url, destfile = temp_file, mode = "wb", quiet = TRUE)
+        unzip(temp_file, exdir = temp_dir)
+        pkg_path <- file.path(temp_dir, paste0(pkg, "-", branch))
+        install.packages(pkg_path, repos = NULL, type = "source")
+        if (requireNamespace(pkg, quietly = TRUE)) {
+          message(sprintf("✔ Package '%s' installed successfully from branch '%s'.", pkg, branch))
+          success <- TRUE
+          break
+        }
+      }, silent = TRUE)
+    }
     
-    # Install from extracted folder
-    pkg_path <- file.path(temp_dir, paste0(pkg, "-", branch))
-    install.packages(pkg_path, repos = NULL, type = "source")
-    
-    # Confirm install
-    if (requireNamespace(pkg, quietly = TRUE)) {
-      message(sprintf("✔ Package '%s' installed successfully from ZIP.", pkg))
-    } else {
-      stop(sprintf("✖ Failed to install package '%s'.", pkg))
+    if (!success) {
+      stop(sprintf("✖ Failed to install '%s' from GitHub using branches: %s",
+                   pkg, paste(branches, collapse = ", ")))
     }
     
     invisible(TRUE)
