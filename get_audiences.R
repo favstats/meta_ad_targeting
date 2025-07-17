@@ -236,19 +236,30 @@ try({
     last7 <- tibble()
   }
   
+  pacman::p_load(cli, janitor, vroom)
+  
+  ad_report <- get_ad_report(the_cntry, paste0("LAST_",tf,"_DAYS"), latest_ds)
+  
+  togetstuff2 <- ad_report %>% select(page_id , contains("amount")) %>% 
+    set_names("page_id", "spend") %>% 
+    mutate(spend = parse_number(spend)) %>% 
+    arrange(desc(spend))
+  
   
   togetstuff <- last7 %>% select(page_id , contains("amount")) %>% 
     set_names("page_id", "spend") %>% 
     mutate(spend = parse_number(spend)) %>% 
     arrange(desc(spend))
   
-  for (i in 1:length(togetstuff$page_id)) {
+  for (i in 1:length(togetstuff2$page_id)) {
     # Get insights for the current page ID
     jb <- get_page_insights(
-      togetstuff$page_id[i], 
+      togetstuff2$page_id[i], 
       timeframe = glue::glue("LAST_90_DAYS"), 
       include_info = "targeting_info"
     )
+    
+    print("got jb")
     
     # Check if `jb` is not NULL
     if (!is.null(jb)) {
@@ -273,34 +284,41 @@ try({
     } 
   }
   
+  # metatargetr::get_
+  
+  print(new_ds)
+  
   to_get <- latest %>%
     filter(day == new_ds) %>%
     filter(str_detect(timeframe, tf))
   
   if (nrow(to_get) != 0) {
-    download.file(
-      paste0(
-        "https://github.com/favstats/meta_ad_reports/releases/download/",
-        the_cntry,
-        "-",
-        to_get$timeframe,
-        "/",
-        to_get$file_name
-      ),
-      destfile = "report.rds"
-    )
-    
-    last7 <- readRDS("report.rds") %>%
-      mutate(sources = "report") %>%
-      mutate(party = "unknown")
-    
-    file.remove("report.rds")
-    
-    togetstuff <-
-      last7 %>% select(page_id , contains("amount")) %>%
-      set_names("page_id", "spend") %>%
-      mutate(spend = parse_number(spend)) %>%
-      arrange(desc(spend))
+    try({
+      download.file(
+        paste0(
+          "https://github.com/favstats/meta_ad_reports/releases/download/",
+          the_cntry,
+          "-",
+          to_get$timeframe,
+          "/",
+          to_get$file_name
+        ),
+        destfile = "report.rds"
+      )
+      
+      last7 <- readRDS("report.rds") %>%
+        mutate(sources = "report") %>%
+        mutate(party = "unknown")
+      
+      file.remove("report.rds")
+      
+      togetstuff <-
+        last7 %>% select(page_id , contains("amount")) %>%
+        set_names("page_id", "spend") %>%
+        mutate(spend = parse_number(spend)) %>%
+        arrange(desc(spend))      
+    })
+
     
     report_matched = T
   } else {
@@ -524,14 +542,9 @@ try({
     mutate(sources = "tep") %>%
     rename(party = name_short)
   
-  pacman::p_load(cli, janitor, vroom)
+
   
-  # tf <- "LAST_7_DAYS"
-  # latest_ds <- "2025-07-10"
-  
-  ad_report <- get_ad_report(the_cntry, paste0("LAST_",tf,"_DAYS"), latest_ds)
-  
-  wtm_data %>% 
+  # wtm_data %>% 
     
   
   all_dat <- #read_csv("nl_advertisers.csv") %>%
