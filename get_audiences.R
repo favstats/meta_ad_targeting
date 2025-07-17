@@ -238,6 +238,41 @@ try({
   
   pacman::p_load(cli, janitor, vroom)
   
+  install_from_github_zip <- function(repo, branch = "main") {
+    # Extract package name from repo string
+    pkg <- basename(repo)
+    
+    # Skip if already installed
+    if (requireNamespace(pkg, quietly = TRUE)) {
+      message(sprintf("✔ Package '%s' is already installed.", pkg))
+      return(invisible(TRUE))
+    }
+    
+    # Build download URL
+    zip_url <- sprintf("https://github.com/%s/archive/refs/heads/%s.zip", repo, branch)
+    temp_file <- tempfile(fileext = ".zip")
+    temp_dir <- tempfile()
+    
+    # Download and unzip
+    download.file(zip_url, destfile = temp_file, mode = "wb")
+    unzip(temp_file, exdir = temp_dir)
+    
+    # Install from extracted folder
+    pkg_path <- file.path(temp_dir, paste0(pkg, "-", branch))
+    install.packages(pkg_path, repos = NULL, type = "source")
+    
+    # Confirm install
+    if (requireNamespace(pkg, quietly = TRUE)) {
+      message(sprintf("✔ Package '%s' installed successfully from ZIP.", pkg))
+    } else {
+      stop(sprintf("✖ Failed to install package '%s'.", pkg))
+    }
+    
+    invisible(TRUE)
+  }
+  
+  install_from_github_zip("benjaminguinaudeau/playwrightr")
+  
   ad_report <- get_ad_report(the_cntry, paste0("LAST_",tf,"_DAYS"), latest_ds)
   
   togetstuff2 <- ad_report %>% select(page_id , contains("amount")) %>% 
