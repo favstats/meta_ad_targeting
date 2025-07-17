@@ -9,7 +9,7 @@ on:
 jobs:
   update-meta-targeting:
     name: Update Meta Targeting
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         iso-code: ["AD", "AE", "AG", "AI", "AL", "AM", "AO", "AR", "AT", "AU", 
