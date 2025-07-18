@@ -43,7 +43,11 @@ jobs:
       WHO_TARGETS_TOKEN: ${{ secrets.WHO_TARGETS_TOKEN }}
     steps:
       - name: Setup - Checkout repo
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+      - name: Install OpenSSL 1.1 (needed for arrow)
+        run: |
+          apt-get update
+          apt-get install -y libssl1.1
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           cache-version: 1
