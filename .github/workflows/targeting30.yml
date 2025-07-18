@@ -43,7 +43,9 @@ jobs:
       TELEGRAM_BOT_ID: ${{ secrets.TELEGRAM_BOT_ID }}
       TELEGRAM_GROUP_ID: ${{ secrets.TELEGRAM_GROUP_ID }}
       WHO_TARGETS_TOKEN: ${{ secrets.WHO_TARGETS_TOKEN }}
-      
+      # NEW: Explicitly tell R's 'reticulate' package which Python to use.
+      # This ensures playwrightr finds the Python module we already installed.
+      RETICULATE_PYTHON: /usr/bin/python3      
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
