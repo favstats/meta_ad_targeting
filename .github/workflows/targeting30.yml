@@ -9,9 +9,10 @@ on:
 jobs:
   update-meta-targeting:
     name: Update Meta Targeting
-    runs-on: ubuntu-latest   # (Unchanged, the runner just needs to support Docker)
-    # NEW: Run the job inside the official rocker/r-ver:4.3.3 Docker container
-    container: rocker/r-ver:4.3.3   # <<<<<< NEW/CHANGED
+    runs-on: ubuntu-latest
+    container:
+      image: rocker/r-ver:4.0.0   # Ubuntu 20.04 base with OpenSSL 1.1
+      options: --network host
     strategy:
       matrix:
         iso-code: ["AD", "AE", "AG", "AI", "AL", "AM", "AO", "AR", "AT", "AU", 
