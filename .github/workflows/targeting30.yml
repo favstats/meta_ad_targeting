@@ -48,13 +48,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install legacy OpenSSL 1.1 for arrow package
+      - name: Install System Dependencies for R Packages
         run: |
+          # Update package lists
           apt-get update
+          
+          # Install wget to download legacy packages
           apt-get install -y --no-install-recommends wget
+          
+          # 1. Install legacy OpenSSL 1.1 for the 'arrow' package
           wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
           dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb
           rm libssl1.1_1.1.1f-1ubuntu2_amd64.deb
+          
+          # 2. Install Python, pip, and Playwright for the 'playwrightr' package
+          apt-get install -y --no-install-recommends python3 python3-pip
+          pip3 install playwright
+          playwright install --with-deps firefox
 
       - name: Install R package dependencies
         uses: r-lib/actions/setup-r-dependencies@v2
