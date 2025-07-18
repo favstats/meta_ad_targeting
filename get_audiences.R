@@ -3,7 +3,6 @@
 # rate_limit <<- F
 try({
   
-  source("https://raw.githubusercontent.com/favstats/metatargetr/refs/heads/master/R/get_ad_report.R")
   
   if (!(Sys.info()[["effective_user"]] %in% c("fabio", "favstats"))) {
     remove.packages("arrow")
@@ -141,14 +140,14 @@ try({
   unlink("targeting", recursive = T, force = T)
   unlink("historic", recursive = T, force = T)
   
-  try({
-    
-  # Step 3: Decrypt the file and read content
-  decrypted_content <- decrypt_file("data/ips-targeting.enc")
-  ips_targeting <- str_split(decrypted_content, "\n", simplify = F)
-
-  ips_targeting <- unlist(ips_targeting)[-1:-2]
-  })
+  # try({
+  #   
+  # # Step 3: Decrypt the file and read content
+  # decrypted_content <- decrypt_file("data/ips-targeting.enc")
+  # ips_targeting <- str_split(decrypted_content, "\n", simplify = F)
+  # 
+  # ips_targeting <- unlist(ips_targeting)[-1:-2]
+  # })
   # 
   print("################ CHECK LATEST REPORT ################")
   
@@ -236,7 +235,7 @@ try({
     last7 <- tibble()
   }
   
-  pacman::p_load(cli, janitor, vroom)
+  pacman::p_load(cli, janitor, vroom, glue)
   
   install_from_github_zip <- function(repo) {
     pkg <- basename(repo)
@@ -275,9 +274,129 @@ try({
     invisible(TRUE)
   }
   
+  # ===================================================================
+  # FOOLPROOF PLAYWRIGHT SETUP FUNCTION
+  # ===================================================================
+  # This function creates a dedicated, isolated Python environment for 
+  # Playwright to ensure R can find and use it reliably.
+  # ===================================================================
+  setup_playwright_foolproof <- function() {
+    cli::cli_h1("Starting Foolproof Playwright Setup")
+    
+    # 1. Ensure essential R packages are installed
+    if (!requireNamespace("reticulate", quietly = TRUE)) install.packages("reticulate")
+    if (!requireNamespace("cli", quietly = TRUE)) install.packages("cli")
+    
+    library(reticulate)
+    library(cli)
+    
+    # 2. Define a name for our dedicated virtual environment
+    venv_name <- "r_playwright_env"
+    
+    # 3. Create the virtual environment if it doesn't exist
+    if (!virtualenv_exists(envname = venv_name)) {
+      cli_alert_info("Creating a new Python virtual environment named '{.strong {venv_name}}'...")
+      tryCatch({
+        virtualenv_create(envname = venv_name)
+      }, error = function(e) {
+        cli_abort("Failed to create Python virtual environment. Error: {e$message}")
+      })
+    }
+    
+    # 4. CRITICAL FIX: Get the Python path and force reticulate to use it
+    # This prevents reticulate from using a cached or incorrect Python executable.
+    python_executable <- virtualenv_python(venv_name)
+    cli_alert_info("Forcing R to use Python from: {.path {python_executable}}")
+    use_python(python_executable, required = TRUE)
+    
+    # 5. Check if Playwright is already available in this specific environment
+    if (py_module_available("playwright")) {
+      cli_alert_success("Playwright is already installed and visible to R. Setup is complete.")
+    } else {
+      # 6. If not, install the 'playwright' Python package into our environment
+      cli_alert_warning("Playwright module not found. Starting installation...")
+      cli_alert_info("Installing 'playwright' Python package. This may take a few minutes...")
+      py_install("playwright", envname = venv_name, pip = TRUE)
+      
+      # 7. Verify the installation again after installing
+      if (!py_module_available("playwright")) {
+        cli_abort("FATAL: 'py_module_available' check failed even after successful pip install.")
+      }
+      cli_alert_success("Successfully installed and verified 'playwright' Python module.")
+    }
+    
+    # 8. Install the browser binaries using the environment's Playwright command
+    cli_alert_info("Installing Firefox browser binaries for Playwright...")
+    
+    # Build the command to ensure we use the correct Playwright installation
+    install_command <- paste(shQuote(python_executable), "-m playwright install --with-deps firefox")
+    
+    cli_alert_info("Running command: {.code {install_command}}")
+    
+    # Execute the command
+    exit_code <- system(install_command)
+    
+    if (exit_code != 0) {
+      cli_abort("Failed to install Playwright browser binaries.")
+    }
+    
+    cli_alert_success("Successfully installed Firefox browser.")
+    cli_h1("Foolproof Playwright Setup is Complete!")
+    
+    return(invisible(TRUE))
+  }
+  
+  
+  setup_playwright_foolproof()
+  
   install_from_github_zip("benjaminguinaudeau/playwrightr")
   
-  ad_report <- get_ad_report(the_cntry, paste0("LAST_",tf,"_DAYS"), latest_ds)
+  source("https://raw.githubusercontent.com/favstats/metatargetr/refs/heads/master/R/get_ad_report.R")
+  
+
+  find_latest_ad_report <- function(the_cntry, tf) {
+    
+    # Generate a sequence of dates to check, from 2 days ago to 11 days ago (10 total days)
+    dates_to_check <- seq.Date(from = Sys.Date() - 2, to = Sys.Date() - 11, by = "-1 day")
+    
+    cli::cli_h2("Searching for the latest available report for '{the_cntry}'...")
+    
+    # Loop through each date in the sequence
+    for (current_date in dates_to_check) {
+      
+      # Format the date as a string for the API call
+      date_string <- format(as.Date(current_date), "%Y-%m-%d")
+      
+      cli::cli_alert_info("Checking for report from: {date_string}")
+      
+      # Attempt to get the report for the current date
+      # Using try() to gracefully handle any errors from get_ad_report
+      ad_report <- try(
+        get_ad_report(the_cntry, paste0("LAST_", tf, "_DAYS"), date_string)#,
+        # silent = TRUE
+      )
+      
+      # Check if the call was successful AND if the returned tibble has rows
+      if (!inherits(ad_report, "try-error") && !is.null(ad_report) && is.data.frame(ad_report) && nrow(ad_report) > 0) {
+        cli::cli_alert_success("Success! Found a valid report with {nrow(ad_report)} rows from {date_string}.")
+        
+        # A valid report was found, so we stop the loop and return it
+        return(ad_report)
+      } else {
+        # If no valid report was found, inform the user and continue to the next day
+        cli::cli_alert_warning("No valid data found for {date_string}. Trying the previous day.")
+      }
+    }
+    
+    # This part is reached only if the loop finishes without finding any valid report
+    cli::cli_alert_danger("Search complete. No valid report found in the last 10 days for '{the_cntry}'.")
+    return(NULL)
+  }
+  
+  the_cntry <- "NO"
+  tf <- "7"
+  
+  ad_report <- find_latest_ad_report(the_cntry, tf)
   
   togetstuff2 <- ad_report %>% select(page_id , contains("amount")) %>% 
     set_names("page_id", "spend") %>% 
