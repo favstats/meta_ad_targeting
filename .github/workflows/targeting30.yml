@@ -42,7 +42,6 @@ jobs:
       TELEGRAM_GROUP_ID: ${{ secrets.TELEGRAM_GROUP_ID }}
       WHO_TARGETS_TOKEN: ${{ secrets.WHO_TARGETS_TOKEN }}
     steps:
-      - name: Setup - Checkout repo
       - uses: actions/checkout@v3
       - name: Install OpenSSL 1.1 (needed for arrow)
         run: |
