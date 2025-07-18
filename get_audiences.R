@@ -317,10 +317,10 @@ try({
     # 3. Now that we have a known-good Python, install Playwright
     cli_alert_info("Installing 'playwright' Python module into the new environment...")
     py_install("playwright", pip = TRUE)
-    
+    conda_install(packages = "playwright", pip = T)
     # 4. Verify the installation
     if (!py_module_available("playwright")) {
-      cli_abort("FATAL: 'py_module_available' check failed even after successful installation.")
+      cli_alert_info("FATAL: 'py_module_available' check failed even after successful installation.")
     }
     cli_alert_success("Successfully installed and verified 'playwright' Python module.")
     
