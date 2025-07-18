@@ -9,9 +9,11 @@ on:
 jobs:
   update-meta-targeting:
     name: Update Meta Targeting
-    runs-on: ubuntu-latest   # (Unchanged, the runner just needs to support Docker)
-    container:
-      image: rocker/r-ver:4.0.0   # Ubuntu 20.04 base with OpenSSL 1.1
+    runs-on: ubuntu-latest
+    
+    # Use a modern R container to support new packages
+    container: rocker/r-ver:4.3.3
+    
     strategy:
       matrix:
         iso-code: ["AD", "AE", "AG", "AI", "AL", "AM", "AO", "AR", "AT", "AU", 
@@ -41,10 +43,21 @@ jobs:
       TELEGRAM_BOT_ID: ${{ secrets.TELEGRAM_BOT_ID }}
       TELEGRAM_GROUP_ID: ${{ secrets.TELEGRAM_GROUP_ID }}
       WHO_TARGETS_TOKEN: ${{ secrets.WHO_TARGETS_TOKEN }}
+      
     steps:
-      - name: Setup - Checkout repo
-        uses: actions/checkout@v3
-      - uses: r-lib/actions/setup-r-dependencies@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install legacy OpenSSL 1.1 for arrow package
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends wget
+          wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
+          dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb
+          rm libssl1.1_1.1.1f-1ubuntu2_amd64.deb
+
+      - name: Install R package dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
         with:
           cache-version: 1
           needs: |
@@ -80,5 +93,7 @@ jobs:
             any::piggyback
             any::httr2
             any::openssl
+            any::arrow
+
       - name: "Script - Meta Run for ${{ matrix.iso-code }}"
         run: Rscript 'get_audiences.R' "30" "${{ matrix.iso-code }}"
