@@ -9,10 +9,9 @@ on:
 jobs:
   update-meta-targeting:
     name: Update Meta Targeting
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest   # (Unchanged, the runner just needs to support Docker)
     container:
       image: rocker/r-ver:4.0.0   # Ubuntu 20.04 base with OpenSSL 1.1
-      options: --network host
     strategy:
       matrix:
         iso-code: ["AD", "AE", "AG", "AI", "AL", "AM", "AO", "AR", "AT", "AU", 
@@ -43,11 +42,8 @@ jobs:
       TELEGRAM_GROUP_ID: ${{ secrets.TELEGRAM_GROUP_ID }}
       WHO_TARGETS_TOKEN: ${{ secrets.WHO_TARGETS_TOKEN }}
     steps:
-      - uses: actions/checkout@v3
-      - name: Install OpenSSL 1.1 (needed for arrow)
-        run: |
-          apt-get update
-          apt-get install -y libssl1.1
+      - name: Setup - Checkout repo
+        uses: actions/checkout@v3
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           cache-version: 1
