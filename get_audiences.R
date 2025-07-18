@@ -280,8 +280,14 @@ try({
   # This function creates a dedicated, isolated Python environment for 
   # Playwright to ensure R can find and use it reliably.
   # ===================================================================
+  # ===================================================================
+  # FOOLPROOF PLAYWRIGHT SETUP FUNCTION (v4 - Final)
+  # ===================================================================
+  # This function installs its own private, self-contained Python via
+  # reticulate, bypassing any system-level Python issues.
+  # ===================================================================
   setup_playwright_foolproof <- function() {
-    cli::cli_h1("Starting Foolproof Playwright Setup")
+    cli::cli_h1("Starting Ultimate Foolproof Playwright Setup")
     
     # 1. Ensure essential R packages are installed
     if (!requireNamespace("reticulate", quietly = TRUE)) install.packages("reticulate")
@@ -290,43 +296,39 @@ try({
     library(reticulate)
     library(cli)
     
-    # 2. Define a name for our dedicated virtual environment
-    venv_name <- "r_playwright_env"
-    
-    # 3. Create the virtual environment if it doesn't exist
-    if (!virtualenv_exists(envname = venv_name)) {
-      cli_alert_info("Creating a new Python virtual environment named '{.strong {venv_name}}'...")
-      tryCatch({
-        virtualenv_create(envname = venv_name)
-      }, error = function(e) {
-        cli_abort("Failed to create Python virtual environment. Error: {e$message}")
-      })
-    }
-    
-    # 4. CRITICAL FIX: Get the Python path and force reticulate to use it
-    # This prevents reticulate from using a cached or incorrect Python executable.
-    python_executable <- virtualenv_python(venv_name)
-    cli_alert_info("Forcing R to use Python from: {.path {python_executable}}")
-    use_python(python_executable, required = TRUE)
-    
-    # 5. Check if Playwright is already available in this specific environment
+    # If playwright is already working, we are done!
     if (py_module_available("playwright")) {
       cli_alert_success("Playwright is already installed and visible to R. Setup is complete.")
-    } else {
-      # 6. If not, install the 'playwright' Python package into our environment
-      cli_alert_warning("Playwright module not found. Starting installation...")
-      cli_alert_info("Installing 'playwright' Python package. This may take a few minutes...")
-      py_install("playwright", envname = venv_name, pip = TRUE)
-      
-      # 7. Verify the installation again after installing
-      if (!py_module_available("playwright")) {
-        cli_abort("FATAL: 'py_module_available' check failed even after successful pip install.")
-      }
-      cli_alert_success("Successfully installed and verified 'playwright' Python module.")
+      return(invisible(TRUE))
     }
     
-    # 8. Install the browser binaries using the environment's Playwright command
+    cli_alert_warning("Playwright not found. Installing a dedicated Python environment via reticulate...")
+    
+    # 2. Install a self-contained version of Python using reticulate
+    # This avoids all issues with the container's system Python.
+    tryCatch({
+      install_python()
+    }, error = function(e){
+      cli_abort(c("x" = "Failed to download and install a self-contained Python.",
+                  "!" = "Original R Error: {e$message}"))
+    })
+    cli_alert_success("Successfully installed a self-contained Python environment for R.")
+    
+    # 3. Now that we have a known-good Python, install Playwright
+    cli_alert_info("Installing 'playwright' Python module into the new environment...")
+    py_install("playwright", pip = TRUE)
+    
+    # 4. Verify the installation
+    if (!py_module_available("playwright")) {
+      cli_abort("FATAL: 'py_module_available' check failed even after successful installation.")
+    }
+    cli_alert_success("Successfully installed and verified 'playwright' Python module.")
+    
+    # 5. Install the browser binaries using the new environment's Playwright command
     cli_alert_info("Installing Firefox browser binaries for Playwright...")
+    
+    # Get the path to the Python executable that reticulate just installed
+    python_executable <- py_config()$python
     
     # Build the command to ensure we use the correct Playwright installation
     install_command <- paste(shQuote(python_executable), "-m playwright install --with-deps firefox")
@@ -341,11 +343,10 @@ try({
     }
     
     cli_alert_success("Successfully installed Firefox browser.")
-    cli_h1("Foolproof Playwright Setup is Complete!")
+    cli_h1("Ultimate Foolproof Playwright Setup is Complete!")
     
     return(invisible(TRUE))
-  }
-  
+  }  
   
   setup_playwright_foolproof()
   
