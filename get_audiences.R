@@ -316,7 +316,10 @@ try({
     
     # 3. Now that we have a known-good Python, install Playwright
     cli_alert_info("Installing 'playwright' Python module into the new environment...")
-    py_install("playwright", pip = TRUE)
+    try({
+      reticulate::virtualenv_create('r-reticulate')
+    })
+    py_install("playwright", pip = TRUE, envname = "r-reticulate")
     reticulate::install_miniconda()
     conda_install(packages = "playwright", pip = T)
     # 4. Verify the installation
