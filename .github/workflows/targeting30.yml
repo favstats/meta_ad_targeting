@@ -54,12 +54,6 @@ jobs:
         run: |
           apt-get update
           
-          # Install dependencies for Python compilation, arrow, and other packages
-          # This is the key fix that allows reticulate::install_python() to work correctly.
-      - name: Install All System Dependencies
-        run: |
-          apt-get update
-          
           # Install dependencies for Python compilation, arrow, and Playwright browsers
           # This is the key fix that includes all browser-related libraries.
           apt-get install -y --no-install-recommends \
@@ -76,6 +70,7 @@ jobs:
             libgstreamer1.0-0 \
             gstreamer1.0-plugins-base \
             gstreamer1.0-plugins-good \
+            gstreamer1.0-plugins-bad \
             gstreamer1.0-gl \
             libgtk-4-1 \
             libgraphene-1.0-0 \

@@ -315,7 +315,6 @@ try({
       })
       cli_alert_success("Successfully installed a self-contained Python environment for R.")     
     }
-
     
     # 3. Now that we have a known-good Python, install Playwright
     cli_alert_info("Installing 'playwright' Python module into the new environment...")
