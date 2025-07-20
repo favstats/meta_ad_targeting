@@ -84,7 +84,7 @@ try({
   
   if (Sys.info()[["effective_user"]] %in% c("fabio", "favstats")) {
     ### CHANGE ME WHEN LOCAL!
-    tf <- "7"
+    tf <- "30"
     the_cntry <- "NO"
     print(paste0("TF: ", tf))
     print(paste0("cntry: ", sets))
@@ -286,78 +286,123 @@ try({
   # This function installs its own private, self-contained Python via
   # reticulate, bypassing any system-level Python issues.
   # ===================================================================
-  setup_playwright_foolproof <- function() {
-    cli::cli_h1("Starting Ultimate Foolproof Playwright Setup")
-    
-    # 1. Ensure essential R packages are installed
-    if (!requireNamespace("reticulate", quietly = TRUE)) install.packages("reticulate")
-    if (!requireNamespace("cli", quietly = TRUE)) install.packages("cli")
-    
-    library(reticulate)
-    library(cli)
-    
-    # If playwright is already working, we are done!
-    if (py_module_available("playwright")) {
-      cli_alert_success("Playwright is already installed and visible to R. Setup is complete.")
-      return(invisible(TRUE))
-    }
-    
-    cli_alert_warning("Playwright not found. Installing a dedicated Python environment via reticulate...")
-    
-    # 2. Install a self-contained version of Python using reticulate
-    # This avoids all issues with the container's system Python.
-    if(!py_available()){
-      tryCatch({
-        install_python()
-      }, error = function(e){
-        cli_abort(c("x" = "Failed to download and install a self-contained Python.",
-                    "!" = "Original R Error: {e$message}"))
-      })
-      cli_alert_success("Successfully installed a self-contained Python environment for R.")     
-    }
-    
-    # 3. Now that we have a known-good Python, install Playwright
-    cli_alert_info("Installing 'playwright' Python module into the new environment...")
-    try({
-      reticulate::virtualenv_create('r-reticulate')
-    })
-    py_install("playwright", pip = TRUE, envname = "r-reticulate")
-    # reticulate::install_miniconda()
-    # conda_install(packages = "playwright", pip = T)
-    # 4. Verify the installation
-    if (!py_module_available("playwright")) {
-      cli_alert_info("FATAL: 'py_module_available' check failed even after successful installation.")
-    }
-    cli_alert_success("Successfully installed and verified 'playwright' Python module.")
-    
-    # 5. Install the browser binaries using the new environment's Playwright command
-    # cli_alert_info("Installing Firefox browser binaries for Playwright...")
-    # 
-    # # Get the path to the Python executable that reticulate just installed
-    # python_executable <- py_config()$python
-    # 
-    # # Build the command to ensure we use the correct Playwright installation
-    # install_command <- paste(shQuote(python_executable), "-m playwright install --with-deps firefox")
-    # 
-    # 
-    # cli_alert_info("Running command: {.code {install_command}}")
-    # 
-    # # Execute the command
-    # exit_code <- system(install_command)
-    # 
-    # if (exit_code != 0) {
-    #   cli_abort("Failed to install Playwright browser binaries.")
-    # }
-    
-    cli_alert_success("Successfully installed Firefox browser.")
-    cli_h1("Ultimate Foolproof Playwright Setup is Complete!")
-    
-    return(invisible(TRUE))
-  }  
-  
-  setup_playwright_foolproof()
+  # setup_playwright_foolproof <- function() {
+  #   cli::cli_h1("Starting Ultimate Foolproof Playwright Setup")
+  #   
+  #   # 1. Ensure essential R packages are installed
+  #   if (!requireNamespace("reticulate", quietly = TRUE)) install.packages("reticulate")
+  #   if (!requireNamespace("cli", quietly = TRUE)) install.packages("cli")
+  #   
+  #   library(reticulate)
+  #   library(cli)
+  #   
+  #   # If playwright is already working, we are done!
+  #   if (py_module_available("playwright")) {
+  #     cli_alert_success("Playwright is already installed and visible to R. Setup is complete.")
+  #     return(invisible(TRUE))
+  #   }
+  #   
+  #   cli_alert_warning("Playwright not found. Installing a dedicated Python environment via reticulate...")
+  #   
+  #   # 2. Install a self-contained version of Python using reticulate
+  #   # This avoids all issues with the container's system Python.
+  #   if(!py_available()){
+  #     tryCatch({
+  #       install_python()
+  #     }, error = function(e){
+  #       cli_abort(c("x" = "Failed to download and install a self-contained Python.",
+  #                   "!" = "Original R Error: {e$message}"))
+  #     })
+  #     cli_alert_success("Successfully installed a self-contained Python environment for R.")     
+  #   }
+  #   
+  #   # 3. Now that we have a known-good Python, install Playwright
+  #   cli_alert_info("Installing 'playwright' Python module into the new environment...")
+  #   try({
+  #     reticulate::virtualenv_create('r-reticulate')
+  #   })
+  #   py_install("playwright", pip = TRUE, envname = "r-reticulate")
+  #   # reticulate::install_miniconda()
+  #   # conda_install(packages = "playwright", pip = T)
+  #   # 4. Verify the installation
+  #   if (!py_module_available("playwright")) {
+  #     cli_alert_info("FATAL: 'py_module_available' check failed even after successful installation.")
+  #   }
+  #   cli_alert_success("Successfully installed and verified 'playwright' Python module.")
+  #   
+  #   # 5. Install the browser binaries using the new environment's Playwright command
+  #   # cli_alert_info("Installing Firefox browser binaries for Playwright...")
+  #   # 
+  #   # # Get the path to the Python executable that reticulate just installed
+  #   # python_executable <- py_config()$python
+  #   # 
+  #   # # Build the command to ensure we use the correct Playwright installation
+  #   # install_command <- paste(shQuote(python_executable), "-m playwright install --with-deps firefox")
+  #   # 
+  #   # 
+  #   # cli_alert_info("Running command: {.code {install_command}}")
+  #   # 
+  #   # # Execute the command
+  #   # exit_code <- system(install_command)
+  #   # 
+  #   # if (exit_code != 0) {
+  #   #   cli_abort("Failed to install Playwright browser binaries.")
+  #   # }
+  #   
+  #   cli_alert_success("Successfully installed Firefox browser.")
+  #   cli_h1("Ultimate Foolproof Playwright Setup is Complete!")
+  #   
+  #   return(invisible(TRUE))
+  # }  
+  # 
+  # setup_playwright_foolproof()
   
   install_from_github_zip("benjaminguinaudeau/playwrightr")
+  
+  library(playwrightr)
+  
+  # releases <- piggyback::pb_releases()
+  
+  # debugonce(pb_releases)
+  # Call the function to perform the operation
+  full_repos <- read_rds("https://github.com/favstats/meta_ad_reports/releases/download/ReleaseInfo/full_repos.rds")
+  
+  
+  
+  
+  # options(googledrive_quiet = TRUE)
+  # 
+  # drive_auth(path = Sys.getenv("GOOGLE_APPLICATION_KEY"))
+  
+  # conda_install(packages = "fcntl", pip = T)
+  if(Sys.info()[["sysname"]]=="Darwin"){
+    
+    pw_init(use_xvfb = F)
+    # time_preset <- "last_90_days"
+    
+  } else{
+    # Load reticulate
+    library(reticulate)
+    
+    # Manually set the Python path (works better in GitHub Actions)
+    use_python("/usr/share/miniconda/envs/r-reticulate/bin/python", required = TRUE)
+    
+    # Install xvfbwrapper and playwright inside the correct environment
+    py_install("xvfbwrapper")
+    print("installed xvfbwrapper")
+    
+    py_install("playwright")
+    print("installed playwright")
+    
+    # Explicitly check if the module exists before proceeding
+    py_run_string("import xvfbwrapper")
+    
+    # Initialize Playwright with xvfb
+    pw_init(use_xvfb = TRUE)
+    
+    # Install Playwright browsers
+    system("playwright install --force")
+  }
   
   source("https://raw.githubusercontent.com/favstats/metatargetr/refs/heads/master/R/get_ad_report.R")
   
