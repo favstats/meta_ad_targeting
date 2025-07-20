@@ -13,7 +13,7 @@ jobs:
     
     strategy:
       matrix:
-        iso-code: ["AT"]
+        iso-code: ["NO"]
     permissions:
       contents: write
     env:
@@ -89,7 +89,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Install playwright browsers
-        run: npx playwright install
+        run: npx playwright install-deps
       - name: "Check Playwright CLI"
         run: npx playwright --version
       - name: Create Conda Environment
@@ -106,5 +106,6 @@ jobs:
       - name: "Script - Meta Run for ${{ matrix.iso-code }}"
         shell: bash -l {0}
         run: |
+          conda init
           conda activate r-reticulate
           Rscript 'get_audiences.R' "30" "${{ matrix.iso-code }}"
