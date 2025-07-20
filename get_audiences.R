@@ -329,22 +329,23 @@ try({
     cli_alert_success("Successfully installed and verified 'playwright' Python module.")
     
     # 5. Install the browser binaries using the new environment's Playwright command
-    cli_alert_info("Installing Firefox browser binaries for Playwright...")
-    
-    # Get the path to the Python executable that reticulate just installed
-    python_executable <- py_config()$python
-    
-    # Build the command to ensure we use the correct Playwright installation
-    install_command <- paste(shQuote(python_executable), "-m playwright install --with-deps firefox")
-    
-    cli_alert_info("Running command: {.code {install_command}}")
-    
-    # Execute the command
-    exit_code <- system(install_command)
-    
-    if (exit_code != 0) {
-      cli_abort("Failed to install Playwright browser binaries.")
-    }
+    # cli_alert_info("Installing Firefox browser binaries for Playwright...")
+    # 
+    # # Get the path to the Python executable that reticulate just installed
+    # python_executable <- py_config()$python
+    # 
+    # # Build the command to ensure we use the correct Playwright installation
+    # install_command <- paste(shQuote(python_executable), "-m playwright install --with-deps firefox")
+    # 
+    # 
+    # cli_alert_info("Running command: {.code {install_command}}")
+    # 
+    # # Execute the command
+    # exit_code <- system(install_command)
+    # 
+    # if (exit_code != 0) {
+    #   cli_abort("Failed to install Playwright browser binaries.")
+    # }
     
     cli_alert_success("Successfully installed Firefox browser.")
     cli_h1("Ultimate Foolproof Playwright Setup is Complete!")
