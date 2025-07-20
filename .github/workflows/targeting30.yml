@@ -63,8 +63,8 @@ jobs:
           libxml2-dev \
           libharfbuzz-dev \
           libfribidi-dev \
-          libasound2 \
-          libffi7 \
+          libasound2t64 \
+          libffi8 \
           libx264-dev \
           libnss3 \
           libxcomposite1 \
