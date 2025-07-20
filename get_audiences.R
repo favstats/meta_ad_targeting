@@ -306,13 +306,16 @@ try({
     
     # 2. Install a self-contained version of Python using reticulate
     # This avoids all issues with the container's system Python.
-    tryCatch({
-      install_python()
-    }, error = function(e){
-      cli_abort(c("x" = "Failed to download and install a self-contained Python.",
-                  "!" = "Original R Error: {e$message}"))
-    })
-    cli_alert_success("Successfully installed a self-contained Python environment for R.")
+    if(!py_available()){
+      tryCatch({
+        install_python()
+      }, error = function(e){
+        cli_abort(c("x" = "Failed to download and install a self-contained Python.",
+                    "!" = "Original R Error: {e$message}"))
+      })
+      cli_alert_success("Successfully installed a self-contained Python environment for R.")     
+    }
+
     
     # 3. Now that we have a known-good Python, install Playwright
     cli_alert_info("Installing 'playwright' Python module into the new environment...")
