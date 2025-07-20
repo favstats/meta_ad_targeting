@@ -56,6 +56,12 @@ jobs:
           
           # Install dependencies for Python compilation, arrow, and other packages
           # This is the key fix that allows reticulate::install_python() to work correctly.
+      - name: Install All System Dependencies
+        run: |
+          apt-get update
+          
+          # Install dependencies for Python compilation, arrow, and Playwright browsers
+          # This is the key fix that includes all browser-related libraries.
           apt-get install -y --no-install-recommends \
             wget \
             libssl-dev \
@@ -66,7 +72,22 @@ jobs:
             libreadline-dev \
             libsqlite3-dev \
             zlib1g-dev \
-            build-essential
+            build-essential \
+            libgstreamer1.0-0 \
+            gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good \
+            gstreamer1.0-gl \
+            libgtk-4-1 \
+            libgraphene-1.0-0 \
+            libxslt1.1 \
+            libwoff2-dec \
+            libevent-2.1-7 \
+            libavif13 \
+            libenchant-2-2 \
+            libsecret-1-0 \
+            libhyphen0 \
+            libmanette-0.2-0 \
+            libgles2
 
           # Install legacy OpenSSL 1.1 needed by the arrow R package
           wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
