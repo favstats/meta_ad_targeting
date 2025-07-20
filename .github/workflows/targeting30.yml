@@ -32,36 +32,12 @@ jobs:
         with:
           r-version: 'release'
 
-      - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          auto-update-conda: true
-          python-version: "3.10" # You can specify a Python version here
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20' # Use a recent LTS version of Node.js
-      
       - name: Install System Dependencies
         run: |
           # Install legacy OpenSSL 1.1 for the 'arrow' R package
           wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
           sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb
           rm libssl1.1_1.1.1f-1ubuntu2_amd64.deb
-          # Install xvfb for headless browser display
-          sudo apt-get update && sudo apt-get install -y xvfb
-          
-      - name: Create and configure Conda environment
-        shell: bash -l {0}
-        run: |
-          conda create -n r-reticulate python=3.10 -y
-          conda activate r-reticulate
-          python -m pip install --upgrade pip
-          python -m pip install playwright xvfbwrapper
-          
-      - name: Install Playwright Browsers (Official Method)
-        run: npx playwright install --with-deps firefox
 
       - name: Install R package dependencies
         uses: r-lib/actions/setup-r-dependencies@v2
@@ -75,6 +51,57 @@ jobs:
             any::fs, any::countrycode, any::progress, any::cli, any::digest,
             any::glue, any::vroom, any::prettydoc, any::DT, any::piggyback,
             any::httr2, any::openssl, any::arrow
+            
+      - name: Apt-get update things
+        run: |
+          sudo apt-get update 
+      - name: Apt-get needed things
+        run: |
+          sudo apt-get install --no-install-recommends -y \
+          libssl-dev \
+          libcurl4-openssl-dev \
+          libxml2-dev \
+          libharfbuzz-dev \
+          libfribidi-dev \
+          libasound2 \
+          libffi7 \
+          libx264-dev \
+          libnss3 \
+          libxcomposite1 \
+          libxcursor1 \
+          libxdamage1 \
+          libxrandr2 \
+          libgbm-dev \
+          libgtk-3-0 \
+          libpango-1.0-0 \
+          libatk1.0-0 \
+          libcairo2 \
+          libx11-xcb1 \
+          libx11-6 \
+          libxcb1
+          
+      - run: echo "🍏 This job's status is ${{ job.status }}."
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16.x'  # Choose the appropriate Node.js version
+
+      - name: Install dependencies
+        run: npm ci
+      - name: Install playwright browsers
+        run: npx playwright install --with-deps
+      - name: "Check Playwright CLI"
+        run: npx playwright --version
+      - name: Create Conda Environment
+        run: conda create -n r-reticulate python=3.11 -y
+      
+      - name: Install Python Packages
+        run: |
+          conda run -n r-reticulate python -m pip install --upgrade pip
+          conda run -n r-reticulate python -m pip install xvfbwrapper playwright
+          
+      - name: Debug Conda Environment
+        run: conda run -n r-reticulate python -c "import sys; print(sys.executable)"
 
       - name: "Script - Meta Run for ${{ matrix.iso-code }}"
         shell: bash -l {0}
