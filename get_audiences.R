@@ -373,7 +373,7 @@ try({
   # options(googledrive_quiet = TRUE)
   # 
   # drive_auth(path = Sys.getenv("GOOGLE_APPLICATION_KEY"))
-  
+  library(reticulate)
   # conda_install(packages = "fcntl", pip = T)
   if(Sys.info()[["sysname"]]=="Darwin"){
     
@@ -447,8 +447,8 @@ try({
     return(NULL)
   }
   
-  the_cntry <- "NO"
-  tf <- "7"
+  # the_cntry <- "NO"
+  # tf <- "30"
   
   ad_report <- find_latest_ad_report(the_cntry, tf)
   
