@@ -80,7 +80,7 @@ jobs:
             libgtk-4-1 \
             libgraphene-1.0-0 \
             libxslt1.1 \
-            libwoff2-dec \
+            libwoff1 \
             libevent-2.1-7 \
             libavif13 \
             libenchant-2-2 \
