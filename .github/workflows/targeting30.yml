@@ -50,15 +50,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install System Dependencies for R Packages
+      - name: Install All System Dependencies
         run: |
-          # Update package lists
           apt-get update
           
-          # Install wget to download legacy packages
-          apt-get install -y --no-install-recommends wget
-          
-          # 1. Install legacy OpenSSL 1.1 for the 'arrow' package
+          # Install dependencies for Python compilation, arrow, and other packages
+          # This is the key fix that allows reticulate::install_python() to work correctly.
+          apt-get install -y --no-install-recommends \
+            wget \
+            libssl-dev \
+            libffi-dev \
+            libbz2-dev \
+            liblzma-dev \
+            libncurses-dev \
+            libreadline-dev \
+            libsqlite3-dev \
+            zlib1g-dev \
+            build-essential
+
+          # Install legacy OpenSSL 1.1 needed by the arrow R package
           wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
           dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb
           rm libssl1.1_1.1.1f-1ubuntu2_amd64.deb
