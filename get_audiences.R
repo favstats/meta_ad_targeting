@@ -85,7 +85,7 @@ try({
   if (Sys.info()[["effective_user"]] %in% c("fabio", "favstats")) {
     ### CHANGE ME WHEN LOCAL!
     tf <- "7"
-    the_cntry <- "GB"
+    the_cntry <- "NO"
     print(paste0("TF: ", tf))
     print(paste0("cntry: ", sets))
     
@@ -322,8 +322,8 @@ try({
       reticulate::virtualenv_create('r-reticulate')
     })
     py_install("playwright", pip = TRUE, envname = "r-reticulate")
-    reticulate::install_miniconda()
-    conda_install(packages = "playwright", pip = T)
+    # reticulate::install_miniconda()
+    # conda_install(packages = "playwright", pip = T)
     # 4. Verify the installation
     if (!py_module_available("playwright")) {
       cli_alert_info("FATAL: 'py_module_available' check failed even after successful installation.")
@@ -380,7 +380,8 @@ try({
       # Attempt to get the report for the current date
       # Using try() to gracefully handle any errors from get_ad_report
       ad_report <- try(
-        get_ad_report(the_cntry, paste0("LAST_", tf, "_DAYS"), date_string)#,
+        get_ad_report(the_cntry, paste0("LAST_", tf, "_DAYS"), date_string) %>% 
+          mutate_all(as.character)
         # silent = TRUE
       )
       
@@ -625,8 +626,11 @@ try({
   # if (the_cntry %in% country_codes & nrow(thedat) != 0) {
   
   library(httr)
-    if (runif(1) < 1e-4 | Sys.info()["effective_user"] == "favstats") {
-    
+    # if (runif(1) < 1e-4 | Sys.info()["effective_user"] == "favstats") {
+      if (runif(1) < 1e-4) {
+        
+      # if (runif(1) < 1e-4) {
+        
     
     try({
       

@@ -814,8 +814,8 @@ get_page_insights <- function (pageid, timeframe = "LAST_30_DAYS", lang = "en-GB
     
   }, silent = T)
   
-  prx <- sample(ips_targeting, 1)
-  prxs <- stringr::str_split(prx, "(?<=\\d)\\:", n = 2)
+  # prx <- sample(ips_targeting, 1)
+  # prxs <- stringr::str_split(prx, "(?<=\\d)\\:", n = 2)
   
   
   ua_list <- c("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
@@ -912,12 +912,12 @@ get_page_insights <- function (pageid, timeframe = "LAST_30_DAYS", lang = "en-GB
         `user-agent` = ua
       ) %>%
       httr2::req_body_raw(body, "application/x-www-form-urlencoded") %>%
-        httr2::req_proxy(
-          url = get_proxy(prxs)[1],
-          port = as.numeric(get_proxy(prxs)[2]),
-          username = get_proxy_user(prxs)[1],
-          password = get_proxy_user(prxs)[2]
-        ) %>%
+        # httr2::req_proxy(
+        #   url = get_proxy(prxs)[1],
+        #   port = as.numeric(get_proxy(prxs)[2]),
+        #   username = get_proxy_user(prxs)[1],
+        #   password = get_proxy_user(prxs)[2]
+        # ) %>%
       httr2::req_perform()
     
     out <- resp %>%
