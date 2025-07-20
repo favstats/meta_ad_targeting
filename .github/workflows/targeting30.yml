@@ -56,9 +56,7 @@ jobs:
           libxml2-dev \
           libharfbuzz-dev \
           libfribidi-dev \
-          libasound2t64 \
           libffi8 \
-          libx264-164 \
           libnss3 \
           libxcomposite1 \
           libxcursor1 \
