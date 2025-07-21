@@ -3,7 +3,6 @@
 # rate_limit <<- F
 try({
   
-  
   if (!(Sys.info()[["effective_user"]] %in% c("fabio", "favstats"))) {
     remove.packages("arrow")
   }
@@ -35,7 +34,7 @@ try({
   library(jsonlite)
   
   
-
+  
   
   Sys.setenv(LIBARROW_MINIMAL = "false")
   Sys.setenv("NOT_CRAN" = "true")
@@ -51,8 +50,8 @@ try({
       )
   )
   if (!(Sys.info()[["effective_user"]] %in% c("fabio", "favstats"))) {
-  install.packages("arrow", repos = "https://packagemanager.rstudio.com/all/__linux__/focal/latest")
-  arrow::install_arrow(verbose = F) # verbose output to debug install errors
+    install.packages("arrow", repos = "https://packagemanager.rstudio.com/all/__linux__/focal/latest")
+    arrow::install_arrow(verbose = F) # verbose output to debug install errors
   }
   # print(arrow::arrow_info())
   # print("##### did you install arrow? #####")
@@ -84,14 +83,14 @@ try({
   
   if (Sys.info()[["effective_user"]] %in% c("fabio", "favstats")) {
     ### CHANGE ME WHEN LOCAL!
-    tf <- "30"
-    the_cntry <- "NO"
+    tf <- "7"
+    the_cntry <- "GB"
     print(paste0("TF: ", tf))
     print(paste0("cntry: ", sets))
     
   }
   
-
+  
   # for (cntryy in full_cntry_list$iso2c) {
   #   the_cntry <-  cntryy
   #   print(the_cntry)
@@ -104,34 +103,34 @@ try({
   #     
   #   }
   
-#   # Telegram bot setup
-#   TELEGRAM_BOT_ID <- Sys.getenv("TELEGRAM_BOT_ID")
-#   TELEGRAM_GROUP_ID <- Sys.getenv("TELEGRAM_GROUP_ID")
-#   
-#   # Function to send a Telegram message
-#   send_telegram_message <- function(message) {
-#     url <- paste0("https://api.telegram.org/bot", TELEGRAM_BOT_ID, "/sendMessage")
-#     httr::POST(url, body = list(chat_id = TELEGRAM_GROUP_ID, text = message), encode = "form")
-#   }
-#   
-#   # Function to log updates with Telegram integration
-#   log_update <- function(stage, tf, cntry, details = "") {
-#     message <- glue::glue(
-#       "
-# 🔹 *Update: {stage}* 🔹
-# 🌍 Country: {cntry}
-# ⏳ Timeframe: {tf}
-# 🕒 Time: {Sys.time()}
-# {details}
-#   "
-#     )
-#     send_telegram_message(message)
-#   }
-#   
-#   log_update <- possibly(log_update, otherwise = NULL, quiet = F)
-#   
-#   log_update("Script Started", tf,   the_cntry, details = "Initializing data processing...")
-#   
+  #   # Telegram bot setup
+  #   TELEGRAM_BOT_ID <- Sys.getenv("TELEGRAM_BOT_ID")
+  #   TELEGRAM_GROUP_ID <- Sys.getenv("TELEGRAM_GROUP_ID")
+  #   
+  #   # Function to send a Telegram message
+  #   send_telegram_message <- function(message) {
+  #     url <- paste0("https://api.telegram.org/bot", TELEGRAM_BOT_ID, "/sendMessage")
+  #     httr::POST(url, body = list(chat_id = TELEGRAM_GROUP_ID, text = message), encode = "form")
+  #   }
+  #   
+  #   # Function to log updates with Telegram integration
+  #   log_update <- function(stage, tf, cntry, details = "") {
+  #     message <- glue::glue(
+  #       "
+  # 🔹 *Update: {stage}* 🔹
+  # 🌍 Country: {cntry}
+  # ⏳ Timeframe: {tf}
+  # 🕒 Time: {Sys.time()}
+  # {details}
+  #   "
+  #     )
+  #     send_telegram_message(message)
+  #   }
+  #   
+  #   log_update <- possibly(log_update, otherwise = NULL, quiet = F)
+  #   
+  #   log_update("Script Started", tf,   the_cntry, details = "Initializing data processing...")
+  #   
   
   # if(rate_limit){
   #   break
@@ -140,14 +139,14 @@ try({
   unlink("targeting", recursive = T, force = T)
   unlink("historic", recursive = T, force = T)
   
-  # try({
-  #   
-  # # Step 3: Decrypt the file and read content
-  # decrypted_content <- decrypt_file("data/ips-targeting.enc")
-  # ips_targeting <- str_split(decrypted_content, "\n", simplify = F)
-  # 
-  # ips_targeting <- unlist(ips_targeting)[-1:-2]
-  # })
+  try({
+    
+    # Step 3: Decrypt the file and read content
+    decrypted_content <- decrypt_file("data/ips-targeting.enc")
+    ips_targeting <- str_split(decrypted_content, "\n", simplify = F)
+    
+    ips_targeting <- unlist(ips_targeting)[-1:-2]
+  })
   # 
   print("################ CHECK LATEST REPORT ################")
   
@@ -170,7 +169,7 @@ try({
         the_assets <-
           httr::GET(
             paste0(
-              "https://github.com/favstats/meta_ad_reports/releases/expanded_assets/",
+              "https://github.com/favstats/meta_ad_reports2/releases/expanded_assets/",
               .x
             )
           )
@@ -216,7 +215,7 @@ try({
     
     download.file(
       paste0(
-        "https://github.com/favstats/meta_ad_reports/releases/download/",
+        "https://github.com/favstats/meta_ad_reports2/releases/download/",
         the_cntry,
         "-last_90_days/",
         latest$file_name
@@ -235,243 +234,19 @@ try({
     last7 <- tibble()
   }
   
-  pacman::p_load(cli, janitor, vroom, glue)
-  
-  install_from_github_zip <- function(repo) {
-    pkg <- basename(repo)
-    if (requireNamespace(pkg, quietly = TRUE)) {
-      message(sprintf("✔ Package '%s' is already installed.", pkg))
-      return(invisible(TRUE))
-    }
-    
-    branches <- c("main", "master")
-    success <- FALSE
-    
-    for (branch in branches) {
-      zip_url <- sprintf("https://github.com/%s/archive/refs/heads/%s.zip", repo, branch)
-      temp_file <- tempfile(fileext = ".zip")
-      temp_dir <- tempfile()
-      
-      message(sprintf("→ Trying branch '%s'...", branch))
-      try({
-        download.file(zip_url, destfile = temp_file, mode = "wb", quiet = TRUE)
-        unzip(temp_file, exdir = temp_dir)
-        pkg_path <- file.path(temp_dir, paste0(pkg, "-", branch))
-        install.packages(pkg_path, repos = NULL, type = "source")
-        if (requireNamespace(pkg, quietly = TRUE)) {
-          message(sprintf("✔ Package '%s' installed successfully from branch '%s'.", pkg, branch))
-          success <- TRUE
-          break
-        }
-      }, silent = TRUE)
-    }
-    
-    if (!success) {
-      stop(sprintf("✖ Failed to install '%s' from GitHub using branches: %s",
-                   pkg, paste(branches, collapse = ", ")))
-    }
-    
-    invisible(TRUE)
-  }
-  
-  # ===================================================================
-  # FOOLPROOF PLAYWRIGHT SETUP FUNCTION
-  # ===================================================================
-  # This function creates a dedicated, isolated Python environment for 
-  # Playwright to ensure R can find and use it reliably.
-  # ===================================================================
-  # ===================================================================
-  # FOOLPROOF PLAYWRIGHT SETUP FUNCTION (v4 - Final)
-  # ===================================================================
-  # This function installs its own private, self-contained Python via
-  # reticulate, bypassing any system-level Python issues.
-  # ===================================================================
-  # setup_playwright_foolproof <- function() {
-  #   cli::cli_h1("Starting Ultimate Foolproof Playwright Setup")
-  #   
-  #   # 1. Ensure essential R packages are installed
-  #   if (!requireNamespace("reticulate", quietly = TRUE)) install.packages("reticulate")
-  #   if (!requireNamespace("cli", quietly = TRUE)) install.packages("cli")
-  #   
-  #   library(reticulate)
-  #   library(cli)
-  #   
-  #   # If playwright is already working, we are done!
-  #   if (py_module_available("playwright")) {
-  #     cli_alert_success("Playwright is already installed and visible to R. Setup is complete.")
-  #     return(invisible(TRUE))
-  #   }
-  #   
-  #   cli_alert_warning("Playwright not found. Installing a dedicated Python environment via reticulate...")
-  #   
-  #   # 2. Install a self-contained version of Python using reticulate
-  #   # This avoids all issues with the container's system Python.
-  #   if(!py_available()){
-  #     tryCatch({
-  #       install_python()
-  #     }, error = function(e){
-  #       cli_abort(c("x" = "Failed to download and install a self-contained Python.",
-  #                   "!" = "Original R Error: {e$message}"))
-  #     })
-  #     cli_alert_success("Successfully installed a self-contained Python environment for R.")     
-  #   }
-  #   
-  #   # 3. Now that we have a known-good Python, install Playwright
-  #   cli_alert_info("Installing 'playwright' Python module into the new environment...")
-  #   try({
-  #     reticulate::virtualenv_create('r-reticulate')
-  #   })
-  #   py_install("playwright", pip = TRUE, envname = "r-reticulate")
-  #   # reticulate::install_miniconda()
-  #   # conda_install(packages = "playwright", pip = T)
-  #   # 4. Verify the installation
-  #   if (!py_module_available("playwright")) {
-  #     cli_alert_info("FATAL: 'py_module_available' check failed even after successful installation.")
-  #   }
-  #   cli_alert_success("Successfully installed and verified 'playwright' Python module.")
-  #   
-  #   # 5. Install the browser binaries using the new environment's Playwright command
-  #   # cli_alert_info("Installing Firefox browser binaries for Playwright...")
-  #   # 
-  #   # # Get the path to the Python executable that reticulate just installed
-  #   # python_executable <- py_config()$python
-  #   # 
-  #   # # Build the command to ensure we use the correct Playwright installation
-  #   # install_command <- paste(shQuote(python_executable), "-m playwright install --with-deps firefox")
-  #   # 
-  #   # 
-  #   # cli_alert_info("Running command: {.code {install_command}}")
-  #   # 
-  #   # # Execute the command
-  #   # exit_code <- system(install_command)
-  #   # 
-  #   # if (exit_code != 0) {
-  #   #   cli_abort("Failed to install Playwright browser binaries.")
-  #   # }
-  #   
-  #   cli_alert_success("Successfully installed Firefox browser.")
-  #   cli_h1("Ultimate Foolproof Playwright Setup is Complete!")
-  #   
-  #   return(invisible(TRUE))
-  # }  
-  # 
-  # setup_playwright_foolproof()
-  
-  install_from_github_zip("benjaminguinaudeau/playwrightr")
-  
-  library(playwrightr)
-  
-  # releases <- piggyback::pb_releases()
-  
-  # debugonce(pb_releases)
-  # Call the function to perform the operation
-  full_repos <- read_rds("https://github.com/favstats/meta_ad_reports/releases/download/ReleaseInfo/full_repos.rds")
-  
-  
-  
-  
-  # options(googledrive_quiet = TRUE)
-  # 
-  # drive_auth(path = Sys.getenv("GOOGLE_APPLICATION_KEY"))
-  library(reticulate)
-  # conda_install(packages = "fcntl", pip = T)
-  if(Sys.info()[["sysname"]]=="Darwin"){
-    
-    pw_init(use_xvfb = F)
-    # time_preset <- "last_90_days"
-    
-  } else{
-    # Load reticulate
-    library(reticulate)
-    
-    # Manually set the Python path (works better in GitHub Actions)
-    use_python("/usr/share/miniconda/envs/r-reticulate/bin/python", required = TRUE)
-    
-    # Install xvfbwrapper and playwright inside the correct environment
-    py_install("xvfbwrapper")
-    print("installed xvfbwrapper")
-    
-    py_install("playwright")
-    print("installed playwright")
-    
-    # Explicitly check if the module exists before proceeding
-    py_run_string("import xvfbwrapper")
-    
-    # Initialize Playwright with xvfb
-    pw_init(use_xvfb = TRUE)
-    
-    # Install Playwright browsers
-    system("playwright install --force")
-  }
-  
-  source("https://raw.githubusercontent.com/favstats/metatargetr/refs/heads/master/R/get_ad_report.R")
-  
-
-  find_latest_ad_report <- function(the_cntry, tf) {
-    
-    # Generate a sequence of dates to check, from 2 days ago to 11 days ago (10 total days)
-    dates_to_check <- seq.Date(from = Sys.Date() - 2, to = Sys.Date() - 11, by = "-1 day")
-    
-    cli::cli_h2("Searching for the latest available report for '{the_cntry}'...")
-    
-    # Loop through each date in the sequence
-    for (current_date in dates_to_check) {
-      
-      # Format the date as a string for the API call
-      date_string <- format(as.Date(current_date), "%Y-%m-%d")
-      
-      cli::cli_alert_info("Checking for report from: {date_string}")
-      
-      # Attempt to get the report for the current date
-      # Using try() to gracefully handle any errors from get_ad_report
-      ad_report <- try(
-        get_ad_report(the_cntry, paste0("LAST_", tf, "_DAYS"), date_string) %>% 
-          mutate_all(as.character)
-        # silent = TRUE
-      )
-      
-      # Check if the call was successful AND if the returned tibble has rows
-      if (!inherits(ad_report, "try-error") && !is.null(ad_report) && is.data.frame(ad_report) && nrow(ad_report) > 0) {
-        cli::cli_alert_success("Success! Found a valid report with {nrow(ad_report)} rows from {date_string}.")
-        
-        # A valid report was found, so we stop the loop and return it
-        return(ad_report)
-      } else {
-        # If no valid report was found, inform the user and continue to the next day
-        cli::cli_alert_warning("No valid data found for {date_string}. Trying the previous day.")
-      }
-    }
-    
-    # This part is reached only if the loop finishes without finding any valid report
-    cli::cli_alert_danger("Search complete. No valid report found in the last 10 days for '{the_cntry}'.")
-    return(NULL)
-  }
-  
-  # the_cntry <- "NO"
-  # tf <- "30"
-  
-  ad_report <- find_latest_ad_report(the_cntry, tf)
-  
-  togetstuff2 <- ad_report %>% select(page_id , contains("amount")) %>% 
-    set_names("page_id", "spend") %>% 
-    mutate(spend = parse_number(spend)) %>% 
-    arrange(desc(spend))
-  
   
   togetstuff <- last7 %>% select(page_id , contains("amount")) %>% 
     set_names("page_id", "spend") %>% 
     mutate(spend = parse_number(spend)) %>% 
     arrange(desc(spend))
   
-  for (i in 1:length(togetstuff2$page_id)) {
+  for (i in 1:length(togetstuff$page_id)) {
     # Get insights for the current page ID
     jb <- get_page_insights(
-      togetstuff2$page_id[i], 
+      togetstuff$page_id[i], 
       timeframe = glue::glue("LAST_90_DAYS"), 
       include_info = "targeting_info"
     )
-    
-    print("got jb")
     
     # Check if `jb` is not NULL
     if (!is.null(jb)) {
@@ -496,41 +271,34 @@ try({
     } 
   }
   
-  # metatargetr::get_
-  
-  print(new_ds)
-  
   to_get <- latest %>%
     filter(day == new_ds) %>%
     filter(str_detect(timeframe, tf))
   
   if (nrow(to_get) != 0) {
-    try({
-      download.file(
-        paste0(
-          "https://github.com/favstats/meta_ad_reports/releases/download/",
-          the_cntry,
-          "-",
-          to_get$timeframe,
-          "/",
-          to_get$file_name
-        ),
-        destfile = "report.rds"
-      )
-      
-      last7 <- readRDS("report.rds") %>%
-        mutate(sources = "report") %>%
-        mutate(party = "unknown")
-      
-      file.remove("report.rds")
-      
-      togetstuff <-
-        last7 %>% select(page_id , contains("amount")) %>%
-        set_names("page_id", "spend") %>%
-        mutate(spend = parse_number(spend)) %>%
-        arrange(desc(spend))      
-    })
-
+    download.file(
+      paste0(
+        "https://github.com/favstats/meta_ad_reports2/releases/download/",
+        the_cntry,
+        "-",
+        to_get$timeframe,
+        "/",
+        to_get$file_name
+      ),
+      destfile = "report.rds"
+    )
+    
+    last7 <- readRDS("report.rds") %>%
+      mutate(sources = "report") %>%
+      mutate(party = "unknown")
+    
+    file.remove("report.rds")
+    
+    togetstuff <-
+      last7 %>% select(page_id , contains("amount")) %>%
+      set_names("page_id", "spend") %>%
+      mutate(spend = parse_number(spend)) %>%
+      arrange(desc(spend))
     
     report_matched = T
   } else {
@@ -668,87 +436,17 @@ try({
   }
   
   
-  # if (the_cntry %in% country_codes & nrow(thedat) != 0) {
-  
-  library(httr)
-    # if (runif(1) < 1e-4 | Sys.info()["effective_user"] == "favstats") {
-      if (runif(1) < 1e-4) {
-        
-      # if (runif(1) < 1e-4) {
-        
+  if (the_cntry %in% country_codes & nrow(thedat) != 0) {
+    wtm_data <- read_csv("data/wtm_advertisers.csv") %>% #names
+      select(page_id = advertisers_platforms.advertiser_platform_ref,
+             page_name = name,
+             party = entities.short_name)  %>%
+      mutate(page_id = as.character(page_id)) %>%
+      mutate(sources = "wtm")
     
-    try({
-      
-      # thecntry <- "CA"
-      url <- "https://data-api.whotargets.me/advertisers-export-csv"
-      
-      token <- Sys.getenv("WHO_TARGETS_TOKEN")
-      
-      headers <- add_headers(
-        accept = "application/json",
-        `accept-language` = "en-US,en;q=0.9,de-DE;q=0.8,de;q=0.7,nl;q=0.6,it;q=0.5,sv;q=0.4,is;q=0.3",
-        # authorization = paste("Bearer", token),
-        `x-access-token` = token ,
-        `content-type` = "application/json",
-        priority = "u=1, i",
-        `sec-ch-ua` = '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
-        `sec-ch-ua-mobile` = "?0",
-        `sec-ch-ua-platform` = '"macOS"',
-        `sec-fetch-dest` = "empty",
-        `sec-fetch-mode` = "cors",
-        `sec-fetch-site` = "same-site"
-      )
-      
-      wtm_data <- country_codes %>% 
-        map_dfr(~{
-          the_cntry <- .x
-          body <- list(
-            alpha2 = stringr::str_to_lower(the_cntry),
-            should_be_emailed = FALSE
-          )
-          
-          response <- POST(url, headers, body = body, encode = "json")
-          
-          # library(tidyverse)
-          
-          # vroom::vroom(url(content(response, "parsed")$url))
-          
-          download.file(content(response, "parsed")$url, destfile = "wtmdata.csv")
-          
-          print(the_cntry)
-          
-          if(nrow(readr::read_csv("wtmdata.csv")!=0 )){
-            wtm_data <- readr::read_csv("wtmdata.csv") %>% #names
-              select(page_id = advertisers_platforms.advertiser_platform_ref,
-                     page_name = name,
-                     party = entities.short_name)  %>%
-              mutate(page_id = as.character(page_id)) %>%
-              mutate(sources = "wtm") %>% 
-              mutate(cntry = the_cntry)
-            
-            return(wtm_data)       
-          }
-          
-
-          
-        })
-      
-      write_csv(wtm_data, "data/wtm_advertisers.csv")
-
-      
-      
-    })
-    
-      
-    }
-
-    
-    
-  # } else {
-    wtm_data <-  read_csv("data/wtm_advertisers.csv")
-  # }
-  
-  wtm_data <- wtm_data %>% filter(cntry == the_cntry)
+  } else {
+    wtm_data <-  tibble(no_data = T)
+  }
   
   polsample <- readRDS("data/polsample.rds")
   
@@ -757,10 +455,6 @@ try({
     mutate(sources = "tep") %>%
     rename(party = name_short)
   
-
-  
-  # wtm_data %>% 
-    
   
   all_dat <- #read_csv("nl_advertisers.csv") %>%
     # mutate(page_id = as.character(page_id)) %>%
@@ -768,7 +462,6 @@ try({
     bind_rows(wtm_data) %>%
     bind_rows(tep_dat) %>%
     bind_rows(last7) %>%
-    bind_rows(ad_report) %>%
     # bind_rows(rep) %>%
     # bind_rows(more_data %>% mutate(sources = "new")) %>%
     # bind_rows(groenams) %>%
@@ -789,7 +482,7 @@ try({
   
   all_dat <- all_dat %>% 
     mutate(amount_spent = parse_number(as.character(all_dat[[the_amount]]))) %>% 
-   arrange(desc(amount_spent))
+    arrange(desc(amount_spent))
   
   djt_page <- all_dat %>% 
     filter(page_id == "153080620724")
@@ -817,14 +510,14 @@ try({
       print(paste0(internal$page_name,": ", round(which(scrape_dat$page_id == internal$page_id)/nrow(scrape_dat)*100, 2)))
       
     }
-   
+    
     
     # if(is.null(fin$error)){
-      
-      fin <<-
-        # get_targeting(internal$page_id, timeframe = glue::glue("LAST_{time}_DAYS")) %>%
-        get_page_insights(internal$page_id, timeframe = glue::glue("LAST_{time}_DAYS"), include_info = "targeting_info", iso2c = the_cntry) %>% 
-        mutate(tstamp = tstamp)
+    
+    fin <<-
+      # get_targeting(internal$page_id, timeframe = glue::glue("LAST_{time}_DAYS")) %>%
+      get_page_insights(internal$page_id, timeframe = glue::glue("LAST_{time}_DAYS"), include_info = "targeting_info", iso2c = the_cntry) %>% 
+      mutate(tstamp = tstamp)
     
     if (nrow(fin) != 0) {
       if (!dir.exists(glue::glue("targeting/{time}"))) {
@@ -849,7 +542,7 @@ try({
     # print(nrow(fin))
     # })
     return(fin)
-      
+    
     # }
     
   }
@@ -961,7 +654,7 @@ try({
       
     }
   })
-    # saveRDS(election_dat, paste0("data/election_dat", tf, ".rds"))
+  # saveRDS(election_dat, paste0("data/election_dat", tf, ".rds"))
   
   # f
   
