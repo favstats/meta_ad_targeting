@@ -9,11 +9,28 @@ on:
 jobs:
   update-meta-targeting:
     name: Update Meta Targeting
-    runs-on: ubuntu-22.04 
-    
+    runs-on: windows-latest
     strategy:
       matrix:
-        iso-code: ["NO"]
+        iso-code: ["AD", "AE", "AG", "AI", "AL", "AM", "AO", "AR", "AT", "AU", 
+                   "AZ", "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BM", 
+                   "BN", "BO", "BR", "BS", "BT", "BW", "BY", "BZ", "CA", "CD", "CF", 
+                   "CG", "CH", "CI", "CL", "CM", "CO", "CR", "CV", "CY", "CZ", "DE", 
+                   "DJ", "DK", "DM", "DO", "DZ", "EC", "EE", "EG", "ER", "ES", "ET", 
+                   "FI", "FJ", "FK", "FM", "FR", "GA", "GB", "GD", "GE", "GG", "GH", 
+                   "GI", "GM", "GN", "GQ", "GR", "GT", "GW", "GY", "HN", "HR", "HT", 
+                   "HU", "ID", "IE", "IL", "IM", "IN", "IQ", "IS", "IT", "JE", "JM", 
+                   "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN", "KW", "KY", "KZ", 
+                   "LA", "LB", "LC", "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY", 
+                   "MA", "MC", "MD", "ME", "MG", "MH", "MK", "ML", "MM", "MN", "MR", 
+                   "MS", "MT", "MU", "MV", "MW", "MX", "MY", "MZ", "NA", "NE", "NG", 
+                   "NI", "NL", "NO", "NP", "NR", "NZ", "OM", "PA", "PE", "PG", "PH", 
+                   "PK", "PL", "PS", "PT", "PW", "PY", "QA", "RO", "RS", "RW", "SA", 
+                   "SB", "SC", "SE", "SG", "SH", "SI", "SK", "SL", "SM", "SN", "SO", 
+                   "SR", "SS", "ST", "SV", "SZ", "TC", "TD", "TG", "TH", "TJ", "TM", 
+                   "TN", "TO", "TR", "TT", "TV", "TW", "TZ", "UA", "UG", "US", "UY", 
+                   "UZ", "VC", "VE", "VG", "VI", "VN", "VU", "WF", "WS", "YE", "YT", 
+                   "ZA", "ZM", "ZW", "XK", "HK", "TL", "KR"]
     permissions:
       contents: write
     env:
@@ -21,89 +38,48 @@ jobs:
       ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
       TELEGRAM_BOT_ID: ${{ secrets.TELEGRAM_BOT_ID }}
       TELEGRAM_GROUP_ID: ${{ secrets.TELEGRAM_GROUP_ID }}
-      WHO_TARGETS_TOKEN: ${{ secrets.WHO_TARGETS_TOKEN }}
-      
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Setup R
         uses: r-lib/actions/setup-r@v2
         with:
           r-version: 'release'
-
-      - name: Install R package dependencies
-        uses: r-lib/actions/setup-r-dependencies@v2
+      - name: Setup - Checkout repo
+        uses: actions/checkout@v3
+      - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           cache-version: 1
           needs: |
-            any::tidyverse, any::httr, any::remotes, any::shiny, any::scales,
-            any::treemap, any::here, any::jsonlite, any::janitor, any::quarto,
-            any::highcharter, any::lubridate, any::gt, any::gtExtras, any::pacman,
-            any::openxlsx, any::sf, any::xml2, any::rvest, any::reticulate,
-            any::fs, any::countrycode, any::progress, any::cli, any::digest,
-            any::glue, any::vroom, any::prettydoc, any::DT, any::piggyback,
-            any::httr2, any::openssl, any::arrow
-            
-      - name: Apt-get update things
-        run: |
-          sudo apt-get update 
-      - name: Apt-get needed things
-        run: |
-          sudo apt-get install --no-install-recommends -y \
-          libssl-dev \
-          libcurl4-openssl-dev \
-          libxml2-dev \
-          libharfbuzz-dev \
-          libfribidi-dev \
-          libffi8 \
-          libnss3 \
-          libxcomposite1 \
-          libxcursor1 \
-          libxdamage1 \
-          libxrandr2 \
-          libgbm-dev \
-          libgtk-3-0 \
-          libpango-1.0-0 \
-          libatk1.0-0 \
-          libcairo2 \
-          libx11-xcb1 \
-          libx11-6 \
-          libxcb1
-          
-      - name: Install System Dependencies
-        run: |
-          # Install legacy OpenSSL 1.1 for the 'arrow' R package
-          wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
-          sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb
-          rm libssl1.1_1.1.1f-1ubuntu2_amd64.deb
-          
-      - run: echo "🍏 This job's status is ${{ job.status }}."
-      - name: Setup Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: '16.x'  # Choose the appropriate Node.js version
-
-      - name: Install dependencies
-        run: npm ci
-      - name: Install playwright browsers
-        run: npx playwright install-deps
-      - name: "Check Playwright CLI"
-        run: npx playwright --version
-      - name: Create Conda Environment
-        run: conda create -n r-reticulate python=3.11 -y
-      
-      - name: Install Python Packages
-        run: |
-          conda run -n r-reticulate python -m pip install --upgrade pip
-          conda run -n r-reticulate python -m pip install xvfbwrapper playwright
-          
-      - name: Debug Conda Environment
-        run: conda run -n r-reticulate python -c "import sys; print(sys.executable)"
-
+            any::tidyverse
+            any::httr
+            any::remotes
+            any::shiny
+            any::scales
+            any::treemap
+            any::here
+            any::jsonlite
+            any::janitor
+            any::quarto
+            any::highcharter
+            any::lubridate
+            any::gt
+            any::gtExtras
+            any::pacman
+            any::openxlsx
+            any::sf
+            any::xml2
+            any::rvest
+            any::reticulate
+            any::fs
+            any::countrycode
+            any::progress
+            any::cli
+            any::digest
+            any::glue
+            any::vroom
+            any::prettydoc
+            any::DT
+            any::piggyback
+            any::httr2
+            any::openssl
       - name: "Script - Meta Run for ${{ matrix.iso-code }}"
-        shell: bash -l {0}
-        run: |
-          conda init
-          conda activate r-reticulate
-          Rscript 'get_audiences.R' "30" "${{ matrix.iso-code }}"
+        run: Rscript 'get_audiences.R' "30" "${{ matrix.iso-code }}"
