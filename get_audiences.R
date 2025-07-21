@@ -1,6 +1,20 @@
 # Get command-line arguments
 # tf <- commandArgs(trailingOnly = TRUE)
 # rate_limit <<- F
+bind_rows_chr <- function(...) {
+  dfs <- list(...)
+  if (length(dfs) == 1L && is.list(dfs[[1L]]) && !inherits(dfs[[1L]], "data.frame")) {
+    dfs <- dfs[[1L]]          # support a single list argument
+  }
+  
+  dfs_chr <- lapply(
+    dfs,
+    \(df) dplyr::mutate(across(everything(), as.character), .data = df)
+  )
+  
+  dplyr::bind_rows(dfs_chr)
+}
+
 try({
   
   if (!(Sys.info()[["effective_user"]] %in% c("fabio", "favstats"))) {
@@ -83,7 +97,7 @@ try({
   
   if (Sys.info()[["effective_user"]] %in% c("fabio", "favstats")) {
     ### CHANGE ME WHEN LOCAL!
-    tf <- "30"
+    tf <- "7"
     the_cntry <- "NO"
     print(paste0("TF: ", tf))
     print(paste0("cntry: ", sets))
@@ -610,7 +624,7 @@ try({
           mutate_at(vars(contains("total_spend_formatted")), ~ parse_number(as.character(.x))) %>%
           # rename(page_id = internal_id) %>%
           left_join(all_dat) %>%
-          bind_rows(latest_elex %>% filter(!(page_id %in% enddat$page_id))) %>%
+          bind_rows_chr(latest_elex %>% filter(!(page_id %in% enddat$page_id))) %>%
           distinct()
         
         dir.create(paste0("historic/",  as.character(new_ds)), recursive = T)
