@@ -2,6 +2,7 @@ name: "Meta Info 30"
 on:
   schedule:
     - cron: '0 2 * * *'
+  workflow_dispatch:
       
 jobs:
   update-meta-info:

@@ -2,9 +2,11 @@ name: Keepalive Workflow
 on:
   schedule:
     - cron: "0 0 * * 0" # Weekly on Sundays
+  workflow_dispatch:
 
 permissions:
   actions: write
+  contents: write
 
 jobs:
   keepalive:

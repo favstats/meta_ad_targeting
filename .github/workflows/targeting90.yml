@@ -2,6 +2,7 @@ name: "Meta Targeting 90"
 on:
   schedule:
     - cron: '0 3,7,13,16,19,22 * * *'
+  workflow_dispatch:
       
 jobs:
   update-meta-targeting:

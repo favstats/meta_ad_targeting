@@ -2,6 +2,7 @@ name: "Meta Targeting 30"
 on:
   schedule:
     - cron: '0 1,4,9,12,15,18,21 * * *'
+  workflow_dispatch:
   push:
     branches:
       - main
