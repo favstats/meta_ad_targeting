@@ -9,6 +9,8 @@ jobs:
     name: Update Meta Info
     runs-on: windows-latest
     strategy:
+      fail-fast: false
+      max-parallel: 24
       matrix:
         iso-code: ["AD", "AE", "AG", "AI", "AL", "AM", "AO", "AR", "AT", "AU", 
                    "AZ", "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BM", 

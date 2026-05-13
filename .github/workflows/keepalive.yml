@@ -15,6 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Keep workflows alive
-        uses: gautamkrishnar/keepalive-workflow@v2
-        with:
-          workflow_files: "targeting30.yml, targeting7.yml, targeting90.yml, info.yml"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for workflow in targeting30.yml targeting7.yml targeting90.yml info.yml; do
+            gh workflow enable "$workflow" || true
+          done

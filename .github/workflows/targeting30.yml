@@ -3,15 +3,14 @@ on:
   schedule:
     - cron: '0 1,4,9,12,15,18,21 * * *'
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 jobs:
   update-meta-targeting:
     name: Update Meta Targeting
     runs-on: windows-latest
     strategy:
+      fail-fast: false
+      max-parallel: 24
       matrix:
         iso-code: ["AD", "AE", "AG", "AI", "AL", "AM", "AO", "AR", "AT", "AU", 
                    "AZ", "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BM", 
