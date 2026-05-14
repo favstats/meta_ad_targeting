@@ -45,7 +45,10 @@ jobs:
           r-version: 'release'
       - name: Setup - Checkout repo
         uses: actions/checkout@v3
-      - uses: r-lib/actions/setup-r-dependencies@v2
+      - name: Setup R dependencies
+        id: setup-deps
+        uses: r-lib/actions/setup-r-dependencies@v2
+        continue-on-error: true
         with:
           cache-version: 1
           needs: |
@@ -81,5 +84,26 @@ jobs:
             any::piggyback
             any::httr2
             any::openssl
+      - name: Fallback - install R dependencies
+        if: steps.setup-deps.outcome != 'success'
+        shell: Rscript {0}
+        run: |
+          packages <- c(
+            "tidyverse", "httr", "remotes", "shiny", "scales", "treemap",
+            "here", "jsonlite", "janitor", "quarto", "highcharter",
+            "lubridate", "gt", "gtExtras", "pacman", "openxlsx", "sf",
+            "xml2", "rvest", "reticulate", "fs", "countrycode", "progress",
+            "cli", "digest", "glue", "vroom", "prettydoc", "DT",
+            "piggyback", "httr2", "openssl"
+          )
+          missing <- packages[!vapply(packages, requireNamespace, logical(1), quietly = TRUE)]
+          if (length(missing) > 0) {
+            options(repos = c(CRAN = "https://cloud.r-project.org"))
+            install.packages(missing)
+          }
+          missing <- packages[!vapply(packages, requireNamespace, logical(1), quietly = TRUE)]
+          if (length(missing) > 0) {
+            stop("Missing R packages after fallback install: ", paste(missing, collapse = ", "))
+          }
       - name: "Script - Meta Run for ${{ matrix.iso-code }}"
         run: Rscript 'get_audiences.R' "30" "${{ matrix.iso-code }}"
