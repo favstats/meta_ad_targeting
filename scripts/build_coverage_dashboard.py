@@ -12,6 +12,7 @@ import concurrent.futures
 import csv
 import datetime as dt
 import html
+import http.client
 import json
 import os
 import re
@@ -75,7 +76,7 @@ class GitHub:
                     continue
                 body = exc.read().decode("utf-8", errors="replace")[:500]
                 raise RuntimeError(f"GitHub API error {exc.code} for {url}: {body}") from exc
-            except urllib.error.URLError:
+            except (http.client.IncompleteRead, TimeoutError, urllib.error.URLError):
                 if attempt < 3:
                     time.sleep(2**attempt)
                     continue
@@ -111,6 +112,26 @@ def date_or_none(value: str | None) -> dt.date | None:
         return dt.date.fromisoformat(value)
     except ValueError:
         return None
+
+
+def date_ranges(dates: list[str]) -> list[list[str]]:
+    parsed = sorted(date_or_none(date) for date in dates)
+    parsed = [date for date in parsed if date is not None]
+    if not parsed:
+        return []
+
+    ranges = []
+    start = parsed[0]
+    previous = parsed[0]
+    for current in parsed[1:]:
+        if current == previous + dt.timedelta(days=1):
+            previous = current
+            continue
+        ranges.append([start.isoformat(), previous.isoformat()])
+        start = current
+        previous = current
+    ranges.append([start.isoformat(), previous.isoformat()])
+    return ranges
 
 
 def lag_days(latest: str | None, expected: str | None) -> int | None:
@@ -155,6 +176,7 @@ def inventory(releases: list[dict[str, Any]], dataset: str) -> dict[str, dict[st
             )
 
         dated.sort(key=lambda x: x["date"], reverse=True)
+        available_dates = sorted({item["date"] for item in dated})
         latest = dated[0] if dated else {}
         by_country.setdefault(country, {})[window] = {
             "tag": tag,
@@ -165,6 +187,7 @@ def inventory(releases: list[dict[str, Any]], dataset: str) -> dict[str, dict[st
             "latest_asset_name": latest.get("name"),
             "latest_asset_updated_at": latest.get("updated_at"),
             "latest_asset_size": latest.get("size"),
+            "available_ranges": date_ranges(available_dates),
         }
     return by_country
 
@@ -197,6 +220,13 @@ def releases_for_tags(client: GitHub, repo: str, tags: list[str]) -> list[dict[s
         for release in pool.map(fetch, tags):
             releases.append(release)
     return releases
+
+
+def releases_for_repo(client: GitHub, repo: str) -> list[dict[str, Any]]:
+    env_name = "COVERAGE_REPORTS_PER_PAGE" if repo == REPORTS_REPO else "COVERAGE_TARGETING_PER_PAGE"
+    default = "10"
+    per_page = max(1, min(100, int(os.environ.get(env_name, os.environ.get("COVERAGE_RELEASES_PER_PAGE", default)))))
+    return client.paginate(f"/repos/{repo}/releases?per_page={per_page}")
 
 
 def expected_dates(rows: dict[str, dict[str, dict[str, Any]]], windows: tuple[str, ...]) -> dict[str, str | None]:
@@ -264,6 +294,7 @@ def coverage_rows(
             item["source_latest_data_date"] = source.get("latest_data_date")
             item["source_dated_asset_count"] = source.get("dated_asset_count", 0)
             item["source_status"] = report_status(source, report_expected.get(window))
+            item["source_available_ranges"] = source.get("available_ranges", [])
             out.append(item)
 
     return out, {"reports": report_expected, "targeting": targeting_expected}
@@ -284,11 +315,13 @@ def row(country: str, dataset: str, window: str, release: dict[str, Any], expect
         "latest_asset_name": release.get("latest_asset_name"),
         "latest_asset_updated_at": release.get("latest_asset_updated_at"),
         "latest_asset_size": release.get("latest_asset_size"),
+        "available_ranges": release.get("available_ranges", []),
         "tag": release.get("tag") or f"{country}-{window}",
         "release_url": release.get("html_url"),
         "source_latest_data_date": None,
         "source_dated_asset_count": None,
         "source_status": None,
+        "source_available_ranges": [],
     }
 
 
@@ -366,10 +399,8 @@ def workflow_runs(client: GitHub) -> list[dict[str, Any]]:
 
 
 def build_manifest(client: GitHub) -> dict[str, Any]:
-    report_tags = release_tags(client, REPORTS_REPO, REPORT_WINDOWS)
-    targeting_tags = release_tags(client, TARGETING_REPO, TARGETING_WINDOWS)
-    reports = inventory(releases_for_tags(client, REPORTS_REPO, report_tags), "reports")
-    targeting = inventory(releases_for_tags(client, TARGETING_REPO, targeting_tags), "targeting")
+    reports = inventory(releases_for_repo(client, REPORTS_REPO), "reports")
+    targeting = inventory(releases_for_repo(client, TARGETING_REPO), "targeting")
     rows, expected = coverage_rows(reports, targeting)
     rows.sort(key=lambda x: (x["dataset"], x["window"], x["status"], x["country"]))
     return {
@@ -508,7 +539,35 @@ def render_rows(manifest: dict[str, Any]) -> str:
     return "\n".join(rendered)
 
 
+def heatmap_payload(manifest: dict[str, Any]) -> dict[str, Any]:
+    rows = []
+    for item in manifest["coverage"]:
+        rows.append(
+            {
+                "country": item["country"],
+                "dataset": item["dataset"],
+                "window": item["window"],
+                "status": item["status"],
+                "ranges": item.get("available_ranges", []),
+                "source_ranges": item.get("source_available_ranges", []),
+                "latest": item.get("latest_data_date"),
+                "expected": item.get("expected_data_date"),
+                "source_latest": item.get("source_latest_data_date"),
+            }
+        )
+
+    return {
+        "generated_at": manifest["generated_at"],
+        "windows": {
+            "reports": list(REPORT_WINDOWS),
+            "targeting": list(TARGETING_WINDOWS),
+        },
+        "rows": rows,
+    }
+
+
 def write_html(manifest: dict[str, Any], path: Path) -> None:
+    heatmap_json = html.escape(json.dumps(heatmap_payload(manifest), separators=(",", ":")))
     template = """<!doctype html>
 <html lang="en">
 <head>
@@ -533,6 +592,15 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
     .card { background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:14px; min-height:142px; }
     .eyebrow { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
     .big { font-size:28px; font-weight:750; margin:4px 0 8px; }
+    .toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0 12px; }
+    .toolbar label { display:inline-flex; gap:6px; align-items:center; color:var(--muted); }
+    select { height:34px; border:1px solid var(--line); border-radius:6px; padding:0 10px; background:var(--paper); color:var(--ink); }
+    .legend { display:flex; flex-wrap:wrap; gap:10px; margin:10px 0 12px; color:var(--muted); }
+    .key { display:inline-flex; align-items:center; gap:6px; }
+    .swatch { width:14px; height:14px; border-radius:3px; border:1px solid rgba(0,0,0,.08); }
+    .heatmap-wrap { overflow:auto; max-height:760px; border:1px solid var(--line); border-radius:8px; background:var(--paper); }
+    #heatmap { display:block; }
+    #hmTip { min-height:24px; margin:8px 0 0; color:var(--muted); }
     .table-wrap { overflow:auto; border:1px solid var(--line); border-radius:8px; background:var(--paper); }
     table { border-collapse:collapse; min-width:940px; width:100%; }
     th,td { padding:9px 10px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
@@ -557,6 +625,26 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
       <div class="grid">__SUMMARY__</div>
     </section>
     <section>
+      <h2>Master Heatmap</h2>
+      <p>Country rows by date columns, built from release asset filenames only.</p>
+      <div class="toolbar">
+        <label>Dataset <select id="hmDataset"><option value="reports">reports</option><option value="targeting">targeting</option></select></label>
+        <label>Window <select id="hmWindow"></select></label>
+        <label>Range <select id="hmRange"><option value="90">90 days</option><option value="180">180 days</option><option value="365" selected>365 days</option><option value="all">all</option></select></label>
+        <label>Sort <select id="hmSort"><option value="country">country</option><option value="status">status</option></select></label>
+      </div>
+      <div class="legend">
+        <span class="key"><span class="swatch" style="background:#16794c"></span>available</span>
+        <span class="key"><span class="swatch" style="background:#e0a321"></span>source only</span>
+        <span class="key"><span class="swatch" style="background:#d6dde6"></span>no source / skipped</span>
+        <span class="key"><span class="swatch" style="background:#f3f6f8"></span>missing</span>
+      </div>
+      <div class="heatmap-wrap">
+        <canvas id="heatmap" width="1200" height="600"></canvas>
+      </div>
+      <p id="hmTip"></p>
+    </section>
+    <section>
       <h2>Workflow Runs</h2>
       <div class="table-wrap">
         <table>
@@ -576,6 +664,192 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
       </div>
     </section>
   </main>
+  <script id="heatmapData" type="application/json">__HEATMAP_JSON__</script>
+  <script>
+    const heatmapData = JSON.parse(document.getElementById('heatmapData').textContent);
+    const hmDataset = document.getElementById('hmDataset');
+    const hmWindow = document.getElementById('hmWindow');
+    const hmRange = document.getElementById('hmRange');
+    const hmSort = document.getElementById('hmSort');
+    const canvas = document.getElementById('heatmap');
+    const tip = document.getElementById('hmTip');
+    const ctx = canvas.getContext('2d');
+    const colors = {
+      available: '#16794c',
+      sourceOnly: '#e0a321',
+      noSource: '#d6dde6',
+      missing: '#f3f6f8',
+      line: '#d9e0e7',
+      text: '#17202a',
+      muted: '#627083'
+    };
+    let drawState = null;
+
+    function parseDate(value) {
+      const parts = value.split('-').map(Number);
+      return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+    }
+
+    function formatDate(date) {
+      return date.toISOString().slice(0, 10);
+    }
+
+    function rangeDateSet(ranges) {
+      const out = new Set();
+      ranges.forEach(range => {
+        const start = parseDate(range[0]);
+        const end = parseDate(range[1]);
+        const total = daysBetween(start, end) + 1;
+        for (let index = 0; index < total; index += 1) {
+          const date = new Date(start);
+          date.setUTCDate(date.getUTCDate() + index);
+          out.add(formatDate(date));
+        }
+      });
+      return out;
+    }
+
+    function daysBetween(start, end) {
+      return Math.round((end - start) / 86400000);
+    }
+
+    function updateWindowOptions() {
+      const windows = heatmapData.windows[hmDataset.value];
+      hmWindow.innerHTML = windows.map(windowName => `<option value="${windowName}">${windowName}</option>`).join('');
+      if (hmDataset.value === 'reports' && windows.includes('last_30_days')) hmWindow.value = 'last_30_days';
+      if (hmDataset.value === 'targeting' && windows.includes('last_7_days')) hmWindow.value = 'last_7_days';
+    }
+
+    function monthLabel(date) {
+      return date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+    }
+
+    function selectedRows() {
+      let rows = heatmapData.rows.filter(row => row.dataset === hmDataset.value && row.window === hmWindow.value);
+      if (hmSort.value === 'status') {
+        const rank = { missing_targeting: 0, behind_source: 1, missing_release: 2, lagging: 3, empty_release: 4, skipped_no_source: 5, fresh: 6 };
+        rows = rows.slice().sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || a.country.localeCompare(b.country));
+      } else {
+        rows = rows.slice().sort((a, b) => a.country.localeCompare(b.country));
+      }
+      return rows;
+    }
+
+    function dateExtent(rows) {
+      const values = [];
+      rows.forEach(row => {
+        row.ranges.forEach(range => values.push(range[0], range[1]));
+        row.source_ranges.forEach(range => values.push(range[0], range[1]));
+        if (row.expected) values.push(row.expected);
+      });
+      values.sort();
+      const fallback = formatDate(new Date());
+      return { min: values[0] || fallback, max: values[values.length - 1] || fallback };
+    }
+
+    function visibleDates(rows) {
+      const extent = dateExtent(rows);
+      let start = parseDate(extent.min);
+      const end = parseDate(extent.max);
+      if (hmRange.value !== 'all') {
+        const days = Number(hmRange.value);
+        const candidate = new Date(end);
+        candidate.setUTCDate(candidate.getUTCDate() - days + 1);
+        if (candidate > start) start = candidate;
+      }
+      const total = daysBetween(start, end) + 1;
+      return Array.from({ length: total }, (_, index) => {
+        const date = new Date(start);
+        date.setUTCDate(date.getUTCDate() + index);
+        return formatDate(date);
+      });
+    }
+
+    function cellColor(row, date) {
+      if (row.dateSet.has(date)) return colors.available;
+      if (row.dataset === 'targeting' && row.sourceDateSet.has(date)) return colors.sourceOnly;
+      if ((row.status === 'skipped_no_source' || row.status === 'empty_release') && row.sourceDateSet.size === 0) return colors.noSource;
+      return colors.missing;
+    }
+
+    function drawHeatmap() {
+      const rows = selectedRows().map(row => ({
+        ...row,
+        dateSet: rangeDateSet(row.ranges),
+        sourceDateSet: rangeDateSet(row.source_ranges)
+      }));
+      const dates = visibleDates(rows);
+      const labelW = 58;
+      const topH = 28;
+      const rowH = 8;
+      const cellW = dates.length <= 95 ? 8 : dates.length <= 190 ? 5 : dates.length <= 370 ? 3 : 2;
+      const cssW = labelW + dates.length * cellW + 16;
+      const cssH = topH + rows.length * rowH + 18;
+      const ratio = window.devicePixelRatio || 1;
+      canvas.style.width = `${cssW}px`;
+      canvas.style.height = `${cssH}px`;
+      canvas.width = Math.ceil(cssW * ratio);
+      canvas.height = Math.ceil(cssH * ratio);
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, cssW, cssH);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, cssW, cssH);
+      ctx.font = '10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      ctx.textBaseline = 'middle';
+
+      dates.forEach((date, index) => {
+        const x = labelW + index * cellW;
+        if (date.endsWith('-01')) {
+          ctx.fillStyle = colors.line;
+          ctx.fillRect(x, topH - 14, 1, rows.length * rowH + 14);
+          ctx.save();
+          ctx.translate(x + 2, 10);
+          ctx.rotate(-Math.PI / 5);
+          ctx.fillStyle = colors.muted;
+          ctx.fillText(monthLabel(parseDate(date)), 0, 0);
+          ctx.restore();
+        }
+      });
+
+      rows.forEach((row, rowIndex) => {
+        const y = topH + rowIndex * rowH;
+        ctx.fillStyle = colors.text;
+        ctx.fillText(row.country, 8, y + rowH / 2);
+        dates.forEach((date, dateIndex) => {
+          ctx.fillStyle = cellColor(row, date);
+          ctx.fillRect(labelW + dateIndex * cellW, y, Math.max(1, cellW - 0.5), rowH - 1);
+        });
+      });
+
+      drawState = { rows, dates, labelW, topH, rowH, cellW };
+      tip.textContent = `${rows.length} countries x ${dates.length} days for ${hmDataset.value} ${hmWindow.value}.`;
+    }
+
+    canvas.addEventListener('mousemove', event => {
+      if (!drawState) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      const dateIndex = Math.floor((x - drawState.labelW) / drawState.cellW);
+      const rowIndex = Math.floor((y - drawState.topH) / drawState.rowH);
+      if (dateIndex < 0 || rowIndex < 0 || dateIndex >= drawState.dates.length || rowIndex >= drawState.rows.length) {
+        tip.textContent = `${drawState.rows.length} countries x ${drawState.dates.length} days for ${hmDataset.value} ${hmWindow.value}.`;
+        return;
+      }
+      const row = drawState.rows[rowIndex];
+      const date = drawState.dates[dateIndex];
+      const state = row.dateSet.has(date) ? 'available' : (row.dataset === 'targeting' && row.sourceDateSet.has(date) ? 'source only' : (row.status === 'skipped_no_source' ? 'no source' : 'missing'));
+      tip.textContent = `${row.country} ${row.dataset} ${row.window} ${date}: ${state} (${row.status})`;
+    });
+
+    [hmDataset, hmRange, hmSort].forEach(element => element.addEventListener('change', () => {
+      if (element === hmDataset) updateWindowOptions();
+      drawHeatmap();
+    }));
+    hmWindow.addEventListener('change', drawHeatmap);
+    updateWindowOptions();
+    drawHeatmap();
+  </script>
 </body>
 </html>
 """
@@ -585,6 +859,7 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
         .replace("__WORKFLOWS__", render_workflows(manifest))
         .replace("__ROW_LIMIT__", str(HTML_ROW_LIMIT))
         .replace("__ROWS__", render_rows(manifest))
+        .replace("__HEATMAP_JSON__", heatmap_json)
     )
     path.write_text(rendered, encoding="utf-8")
 
