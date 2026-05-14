@@ -3,6 +3,9 @@
 .Rdata
 .httr-oauth
 .DS_Store
+__pycache__/
+*.pyc
 ips-targeting.txt
 data/wtm_advertisers.csv
 wtmdata.csv
+coverage/

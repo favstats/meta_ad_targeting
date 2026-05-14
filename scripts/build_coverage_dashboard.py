@@ -1,0 +1,612 @@
+#!/usr/bin/env python3
+"""Build a GitHub-only coverage manifest and tiny dashboard.
+
+This observes release assets and workflow metadata. It does not call Meta,
+download report files, or run scraper code.
+"""
+
+from __future__ import annotations
+
+import argparse
+import concurrent.futures
+import csv
+import datetime as dt
+import html
+import json
+import os
+import re
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+
+API_ROOT = "https://api.github.com"
+REPORTS_REPO = "favstats/meta_ad_reports2"
+TARGETING_REPO = "favstats/meta_ad_targeting"
+
+REPORT_WINDOWS = ("yesterday", "last_7_days", "last_30_days", "last_90_days", "lifelong")
+TARGETING_WINDOWS = ("last_7_days", "last_30_days", "last_90_days")
+WORKFLOWS = (
+    (REPORTS_REPO, "reports", "yesterday", "reportsyesterday.yml", "Reports Yesterday"),
+    (REPORTS_REPO, "reports", "last_7_days", "reports7.yml", "Reports 7"),
+    (REPORTS_REPO, "reports", "last_30_days", "reports30.yml", "Reports 30"),
+    (REPORTS_REPO, "reports", "last_90_days", "reports90.yml", "Reports 90"),
+    (REPORTS_REPO, "reports", "lifelong", "reportslifelong.yml", "Reports Lifelong"),
+    (TARGETING_REPO, "targeting", "last_7_days", "targeting7.yml", "Targeting 7"),
+    (TARGETING_REPO, "targeting", "last_30_days", "targeting30.yml", "Targeting 30"),
+    (TARGETING_REPO, "targeting", "last_90_days", "targeting90.yml", "Targeting 90"),
+    (TARGETING_REPO, "targeting", "info", "info.yml", "Targeting Info"),
+    ("favstats/metaus", "vpn", "us", "retrieve.yml", "VPN / Meta US"),
+    ("favstats/metade", "vpn", "de", "retrieve.yml", "VPN / Meta DE"),
+)
+
+TAG_RE = re.compile(r"^(?P<country>[A-Z]{2})-(?P<window>yesterday|last_7_days|last_30_days|last_90_days|lifelong)$")
+DATE_ASSET_RE = re.compile(r"^(?P<date>\d{4}-\d{2}-\d{2})\.(?P<ext>rds|zip|parquet)$")
+HTML_ROW_LIMIT = 900
+
+
+class GitHub:
+    def __init__(self, token: str | None) -> None:
+        self.token = token
+
+    def get(self, path_or_url: str) -> tuple[Any, dict[str, str]]:
+        url = path_or_url if path_or_url.startswith("http") else f"{API_ROOT}{path_or_url}"
+        request = urllib.request.Request(url)
+        request.add_header("Accept", "application/vnd.github+json")
+        request.add_header("X-GitHub-Api-Version", "2022-11-28")
+        request.add_header("User-Agent", "meta-coverage-dashboard")
+        if self.token:
+            request.add_header("Authorization", f"Bearer {self.token}")
+
+        for attempt in range(4):
+            try:
+                with urllib.request.urlopen(request, timeout=45) as response:
+                    headers = {k.lower(): v for k, v in response.headers.items()}
+                    return json.loads(response.read().decode("utf-8")), headers
+            except urllib.error.HTTPError as exc:
+                if exc.code in {403, 429, 500, 502, 503, 504} and attempt < 3:
+                    reset = exc.headers.get("x-ratelimit-reset")
+                    wait = max(1, min(60, int(reset) - int(time.time()) + 1)) if reset and exc.code == 403 else 2**attempt
+                    time.sleep(wait)
+                    continue
+                body = exc.read().decode("utf-8", errors="replace")[:500]
+                raise RuntimeError(f"GitHub API error {exc.code} for {url}: {body}") from exc
+            except urllib.error.URLError:
+                if attempt < 3:
+                    time.sleep(2**attempt)
+                    continue
+                raise
+        raise RuntimeError(f"GitHub API failed for {url}")
+
+    def paginate(self, path: str) -> list[Any]:
+        url = f"{API_ROOT}{path}"
+        out: list[Any] = []
+        while url:
+            payload, headers = self.get(url)
+            out.extend(payload if isinstance(payload, list) else [payload])
+            url = next_link(headers.get("link", ""))
+        return out
+
+
+def next_link(header: str) -> str | None:
+    for part in header.split(","):
+        match = re.search(r'<([^>]+)>;\s*rel="next"', part)
+        if match:
+            return match.group(1)
+    return None
+
+
+def now_utc() -> str:
+    return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def date_or_none(value: str | None) -> dt.date | None:
+    if not value:
+        return None
+    try:
+        return dt.date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def lag_days(latest: str | None, expected: str | None) -> int | None:
+    latest_date = date_or_none(latest)
+    expected_date = date_or_none(expected)
+    return None if latest_date is None or expected_date is None else (expected_date - latest_date).days
+
+
+def inventory(releases: list[dict[str, Any]], dataset: str) -> dict[str, dict[str, dict[str, Any]]]:
+    by_country: dict[str, dict[str, dict[str, Any]]] = {}
+    for release in releases:
+        tag = release.get("tag_name") or ""
+        match = TAG_RE.match(tag)
+        if not match:
+            continue
+
+        country = match.group("country")
+        window = match.group("window")
+        if dataset == "reports" and window not in REPORT_WINDOWS:
+            continue
+        if dataset == "targeting" and window not in TARGETING_WINDOWS:
+            continue
+
+        dated = []
+        assets = release.get("assets") or []
+        for asset in assets:
+            asset_name = asset.get("name") or ""
+            asset_match = DATE_ASSET_RE.match(asset_name)
+            if not asset_match:
+                continue
+            if dataset == "reports" and asset_match.group("ext") != "rds":
+                continue
+            if dataset == "targeting" and asset_match.group("ext") != "parquet":
+                continue
+            dated.append(
+                {
+                    "name": asset_name,
+                    "date": asset_match.group("date"),
+                    "updated_at": asset.get("updated_at"),
+                    "size": asset.get("size"),
+                }
+            )
+
+        dated.sort(key=lambda x: x["date"], reverse=True)
+        latest = dated[0] if dated else {}
+        by_country.setdefault(country, {})[window] = {
+            "tag": tag,
+            "html_url": release.get("html_url"),
+            "asset_count": len(assets),
+            "dated_asset_count": len(dated),
+            "latest_data_date": latest.get("date"),
+            "latest_asset_name": latest.get("name"),
+            "latest_asset_updated_at": latest.get("updated_at"),
+            "latest_asset_size": latest.get("size"),
+        }
+    return by_country
+
+
+def release_tags(client: GitHub, repo: str, windows: tuple[str, ...]) -> list[str]:
+    payload, _ = client.get(f"/repos/{repo}/git/matching-refs/tags/")
+    tags = []
+    for ref in payload:
+        tag = (ref.get("ref") or "").replace("refs/tags/", "", 1)
+        match = TAG_RE.match(tag)
+        if match and match.group("window") in windows:
+            tags.append(tag)
+    return sorted(set(tags))
+
+
+def releases_for_tags(client: GitHub, repo: str, tags: list[str]) -> list[dict[str, Any]]:
+    workers = max(1, int(os.environ.get("COVERAGE_WORKERS", "8")))
+
+    def fetch(tag: str) -> dict[str, Any]:
+        path = f"/repos/{repo}/releases/tags/{urllib.parse.quote(tag, safe='')}"
+        try:
+            release, _ = client.get(path)
+            return release
+        except Exception as exc:
+            print(f"warning: could not fetch {repo} release {tag}: {exc}", file=sys.stderr)
+            return {"tag_name": tag, "html_url": f"https://github.com/{repo}/releases/tag/{tag}", "assets": []}
+
+    releases: list[dict[str, Any]] = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+        for release in pool.map(fetch, tags):
+            releases.append(release)
+    return releases
+
+
+def expected_dates(rows: dict[str, dict[str, dict[str, Any]]], windows: tuple[str, ...]) -> dict[str, str | None]:
+    expected: dict[str, str | None] = {}
+    for window in windows:
+        dates = [
+            entry["latest_data_date"]
+            for country_rows in rows.values()
+            for row_window, entry in country_rows.items()
+            if row_window == window and entry.get("latest_data_date")
+        ]
+        expected[window] = max(dates) if dates else None
+    return expected
+
+
+def report_status(release: dict[str, Any], expected: str | None) -> str:
+    if not release.get("tag"):
+        return "missing_release"
+    if release.get("dated_asset_count", 0) == 0:
+        return "empty_release"
+    if expected and release.get("latest_data_date") == expected:
+        return "fresh"
+    return "lagging"
+
+
+def targeting_status(release: dict[str, Any], source: dict[str, Any], expected: str | None) -> str:
+    source_count = source.get("dated_asset_count", 0)
+    target_count = release.get("dated_asset_count", 0)
+    source_latest = source.get("latest_data_date")
+    target_latest = release.get("latest_data_date")
+
+    if target_count == 0:
+        return "skipped_no_source" if source_count == 0 else "missing_targeting"
+    if source_count == 0 and expected and target_latest != expected:
+        return "skipped_no_source"
+    if source_latest and target_latest and date_or_none(target_latest) and date_or_none(source_latest):
+        if date_or_none(target_latest) < date_or_none(source_latest):
+            return "behind_source"
+    if expected and target_latest == expected:
+        return "fresh"
+    return "lagging"
+
+
+def coverage_rows(
+    reports: dict[str, dict[str, dict[str, Any]]],
+    targeting: dict[str, dict[str, dict[str, Any]]],
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, str | None]]]:
+    report_expected = expected_dates(reports, REPORT_WINDOWS)
+    targeting_expected = expected_dates(targeting, TARGETING_WINDOWS)
+    countries = sorted(set(reports) | set(targeting))
+    out: list[dict[str, Any]] = []
+
+    for country in countries:
+        for window in REPORT_WINDOWS:
+            release = reports.get(country, {}).get(window, {})
+            expected = report_expected.get(window)
+            out.append(row(country, "reports", window, release, expected, report_status(release, expected)))
+
+        for window in TARGETING_WINDOWS:
+            release = targeting.get(country, {}).get(window, {})
+            source = reports.get(country, {}).get(window, {})
+            expected = targeting_expected.get(window)
+            status = targeting_status(release, source, expected)
+            item = row(country, "targeting", window, release, expected, status)
+            item["source_latest_data_date"] = source.get("latest_data_date")
+            item["source_dated_asset_count"] = source.get("dated_asset_count", 0)
+            item["source_status"] = report_status(source, report_expected.get(window))
+            out.append(item)
+
+    return out, {"reports": report_expected, "targeting": targeting_expected}
+
+
+def row(country: str, dataset: str, window: str, release: dict[str, Any], expected: str | None, status: str) -> dict[str, Any]:
+    latest = release.get("latest_data_date")
+    return {
+        "dataset": dataset,
+        "country": country,
+        "window": window,
+        "status": status,
+        "latest_data_date": latest,
+        "expected_data_date": expected,
+        "lag_days": lag_days(latest, expected),
+        "asset_count": release.get("asset_count", 0),
+        "dated_asset_count": release.get("dated_asset_count", 0),
+        "latest_asset_name": release.get("latest_asset_name"),
+        "latest_asset_updated_at": release.get("latest_asset_updated_at"),
+        "latest_asset_size": release.get("latest_asset_size"),
+        "tag": release.get("tag") or f"{country}-{window}",
+        "release_url": release.get("html_url"),
+        "source_latest_data_date": None,
+        "source_dated_asset_count": None,
+        "source_status": None,
+    }
+
+
+def summaries(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out = []
+    for dataset, window in sorted({(x["dataset"], x["window"]) for x in rows}):
+        selected = [x for x in rows if x["dataset"] == dataset and x["window"] == window]
+        counts: dict[str, int] = {}
+        for item in selected:
+            counts[item["status"]] = counts.get(item["status"], 0) + 1
+        out.append(
+            {
+                "dataset": dataset,
+                "window": window,
+                "total": len(selected),
+                "expected_data_date": selected[0].get("expected_data_date") if selected else None,
+                "status_counts": dict(sorted(counts.items())),
+            }
+        )
+    return out
+
+
+def workflow_runs(client: GitHub) -> list[dict[str, Any]]:
+    out = []
+    for repo, dataset, window, workflow, label in WORKFLOWS:
+        path = f"/repos/{repo}/actions/workflows/{urllib.parse.quote(workflow, safe='')}/runs?per_page=5"
+        try:
+            payload, _ = client.get(path)
+            runs = payload.get("workflow_runs", [])
+            latest = runs[0] if runs else {}
+            out.append(
+                {
+                    "repo": repo,
+                    "dataset": dataset,
+                    "window": window,
+                    "workflow": workflow,
+                    "label": label,
+                    "status": latest.get("status"),
+                    "conclusion": latest.get("conclusion"),
+                    "event": latest.get("event"),
+                    "created_at": latest.get("created_at"),
+                    "updated_at": latest.get("updated_at"),
+                    "head_sha": latest.get("head_sha"),
+                    "html_url": latest.get("html_url"),
+                    "recent_runs": [
+                        {
+                            "database_id": run.get("database_id"),
+                            "status": run.get("status"),
+                            "conclusion": run.get("conclusion"),
+                            "event": run.get("event"),
+                            "created_at": run.get("created_at"),
+                            "updated_at": run.get("updated_at"),
+                            "head_sha": run.get("head_sha"),
+                            "html_url": run.get("html_url"),
+                        }
+                        for run in runs
+                    ],
+                }
+            )
+        except Exception as exc:
+            out.append(
+                {
+                    "repo": repo,
+                    "dataset": dataset,
+                    "window": window,
+                    "workflow": workflow,
+                    "label": label,
+                    "status": "error",
+                    "conclusion": "error",
+                    "error": str(exc),
+                    "recent_runs": [],
+                }
+            )
+    return out
+
+
+def build_manifest(client: GitHub) -> dict[str, Any]:
+    report_tags = release_tags(client, REPORTS_REPO, REPORT_WINDOWS)
+    targeting_tags = release_tags(client, TARGETING_REPO, TARGETING_WINDOWS)
+    reports = inventory(releases_for_tags(client, REPORTS_REPO, report_tags), "reports")
+    targeting = inventory(releases_for_tags(client, TARGETING_REPO, targeting_tags), "targeting")
+    rows, expected = coverage_rows(reports, targeting)
+    rows.sort(key=lambda x: (x["dataset"], x["window"], x["status"], x["country"]))
+    return {
+        "generated_at": now_utc(),
+        "note": "GitHub-only coverage: release assets and workflow run metadata; no Meta endpoints are called.",
+        "repos": {
+            "reports": REPORTS_REPO,
+            "targeting": TARGETING_REPO,
+            "vpn_us": "favstats/metaus",
+            "vpn_de": "favstats/metade",
+        },
+        "expected_dates": expected,
+        "summary": summaries(rows),
+        "coverage": rows,
+        "workflows": workflow_runs(client),
+    }
+
+
+def write_csv(rows: list[dict[str, Any]], path: Path) -> None:
+    fields = [
+        "dataset",
+        "country",
+        "window",
+        "status",
+        "latest_data_date",
+        "expected_data_date",
+        "lag_days",
+        "asset_count",
+        "dated_asset_count",
+        "latest_asset_name",
+        "latest_asset_updated_at",
+        "latest_asset_size",
+        "source_latest_data_date",
+        "source_dated_asset_count",
+        "source_status",
+        "tag",
+        "release_url",
+    ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fields, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def badge(value: str | None) -> str:
+    label = value or "unknown"
+    klass = {
+        "fresh": "ok",
+        "success": "ok",
+        "in_progress": "run",
+        "queued": "run",
+        "startup_queued": "run",
+        "skipped_no_source": "skip",
+        "empty_release": "skip",
+        "cancelled": "skip",
+        "lagging": "warn",
+        "behind_source": "bad",
+        "missing_targeting": "bad",
+        "missing_release": "bad",
+        "failure": "bad",
+        "error": "bad",
+    }.get(label, "warn")
+    return f'<span class="badge {klass}">{html.escape(label)}</span>'
+
+
+def render_summary(manifest: dict[str, Any]) -> str:
+    cards = []
+    for item in manifest["summary"]:
+        counts = item["status_counts"]
+        fresh = counts.get("fresh", 0)
+        skipped = counts.get("skipped_no_source", 0) + counts.get("empty_release", 0)
+        trouble = item["total"] - fresh - skipped
+        cards.append(
+            "\n".join(
+                [
+                    '<article class="card">',
+                    f'<div class="eyebrow">{html.escape(item["dataset"])}</div>',
+                    f'<h3>{html.escape(item["window"])}</h3>',
+                    f'<div class="big">{fresh}/{item["total"]}</div>',
+                    f'<p>Expected <strong>{html.escape(str(item.get("expected_data_date") or "none"))}</strong></p>',
+                    f'<p>{badge("fresh")} {fresh} {badge("skipped_no_source")} {skipped} {badge("lagging")} {trouble}</p>',
+                    "</article>",
+                ]
+            )
+        )
+    return "\n".join(cards)
+
+
+def render_workflows(manifest: dict[str, Any]) -> str:
+    rows = []
+    for item in manifest["workflows"]:
+        status = item.get("conclusion") or item.get("status")
+        sha = (item.get("head_sha") or "")[:7]
+        url = item.get("html_url") or "#"
+        rows.append(
+            "<tr>"
+            f'<td><a href="{html.escape(url)}">{html.escape(item["label"])}</a></td>'
+            f"<td>{html.escape(item['repo'])}</td>"
+            f"<td>{badge(status)}</td>"
+            f"<td>{html.escape(item.get('updated_at') or '')}</td>"
+            f"<td>{html.escape(item.get('event') or '')}</td>"
+            f"<td><code>{html.escape(sha)}</code></td>"
+            "</tr>"
+        )
+    return "\n".join(rows)
+
+
+def render_rows(manifest: dict[str, Any]) -> str:
+    priority = {
+        "missing_targeting": 0,
+        "behind_source": 1,
+        "missing_release": 2,
+        "lagging": 3,
+        "empty_release": 4,
+        "skipped_no_source": 5,
+        "fresh": 6,
+    }
+    rows = sorted(manifest["coverage"], key=lambda x: (priority.get(x["status"], 9), x["dataset"], x["window"], x["country"]))
+    rendered = []
+    for item in rows[:HTML_ROW_LIMIT]:
+        url = item.get("release_url") or "#"
+        lag = "" if item.get("lag_days") is None else str(item["lag_days"])
+        rendered.append(
+            "<tr>"
+            f"<td>{html.escape(item['country'])}</td>"
+            f"<td>{html.escape(item['dataset'])}</td>"
+            f"<td>{html.escape(item['window'])}</td>"
+            f"<td>{badge(item['status'])}</td>"
+            f"<td>{html.escape(str(item.get('latest_data_date') or ''))}</td>"
+            f"<td>{html.escape(str(item.get('expected_data_date') or ''))}</td>"
+            f"<td>{html.escape(lag)}</td>"
+            f"<td>{html.escape(str(item.get('source_latest_data_date') or ''))}</td>"
+            f'<td><a href="{html.escape(url)}">{html.escape(item["tag"])}</a></td>'
+            "</tr>"
+        )
+    return "\n".join(rendered)
+
+
+def write_html(manifest: dict[str, Any], path: Path) -> None:
+    template = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Meta Scraper Coverage</title>
+  <style>
+    :root { --ink:#17202a; --muted:#627083; --line:#d9e0e7; --paper:#fff; --soft:#f4f7fa; --ok:#16794c; --warn:#a15c00; --bad:#b3261e; --skip:#596579; --run:#3867b7; }
+    * { box-sizing: border-box; }
+    body { margin:0; font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--ink); background:var(--soft); }
+    header { padding:28px clamp(18px,4vw,48px) 16px; background:var(--paper); border-bottom:1px solid var(--line); }
+    main { padding:18px clamp(18px,4vw,48px) 42px; }
+    h1 { margin:0 0 8px; font-size:clamp(24px,3vw,36px); letter-spacing:0; }
+    h2 { margin:28px 0 12px; font-size:18px; letter-spacing:0; }
+    h3 { margin:4px 0 8px; font-size:16px; letter-spacing:0; }
+    p { margin:0 0 8px; color:var(--muted); }
+    a { color:#1d5fa7; text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    code { background:#eef3f7; padding:2px 5px; border-radius:4px; }
+    .note { max-width:920px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; }
+    .card { background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:14px; min-height:142px; }
+    .eyebrow { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+    .big { font-size:28px; font-weight:750; margin:4px 0 8px; }
+    .table-wrap { overflow:auto; border:1px solid var(--line); border-radius:8px; background:var(--paper); }
+    table { border-collapse:collapse; min-width:940px; width:100%; }
+    th,td { padding:9px 10px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
+    th { background:#eef3f7; font-size:12px; color:#334155; position:sticky; top:0; z-index:1; }
+    tr:last-child td { border-bottom:0; }
+    .badge { display:inline-flex; align-items:center; min-height:22px; padding:2px 7px; border-radius:999px; font-size:12px; font-weight:650; background:#edf1f5; }
+    .ok { color:var(--ok); background:#e7f4ee; }
+    .warn { color:var(--warn); background:#fff1dc; }
+    .bad { color:var(--bad); background:#fdebea; }
+    .skip { color:var(--skip); background:#eef1f5; }
+    .run { color:var(--run); background:#e9f0fb; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Meta Scraper Coverage</h1>
+    <p class="note">Generated __GENERATED_AT__. GitHub-only observability: release assets and workflow metadata, no Meta endpoints.</p>
+  </header>
+  <main>
+    <section>
+      <h2>Coverage</h2>
+      <div class="grid">__SUMMARY__</div>
+    </section>
+    <section>
+      <h2>Workflow Runs</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Workflow</th><th>Repo</th><th>Status</th><th>Updated</th><th>Event</th><th>SHA</th></tr></thead>
+          <tbody>__WORKFLOWS__</tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Rows Needing Attention First</h2>
+      <p>Showing the first __ROW_LIMIT__ rows ordered by attention priority. The complete machine-readable manifest is in coverage.json.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Country</th><th>Dataset</th><th>Window</th><th>Status</th><th>Latest</th><th>Expected</th><th>Lag</th><th>Source Latest</th><th>Release</th></tr></thead>
+          <tbody>__ROWS__</tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
+"""
+    rendered = (
+        template.replace("__GENERATED_AT__", html.escape(manifest["generated_at"]))
+        .replace("__SUMMARY__", render_summary(manifest))
+        .replace("__WORKFLOWS__", render_workflows(manifest))
+        .replace("__ROW_LIMIT__", str(HTML_ROW_LIMIT))
+        .replace("__ROWS__", render_rows(manifest))
+    )
+    path.write_text(rendered, encoding="utf-8")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", default="coverage")
+    args = parser.parse_args()
+
+    output_dir = Path(args.output)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    client = GitHub(os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN"))
+
+    manifest = build_manifest(client)
+    (output_dir / "coverage.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_csv(manifest["coverage"], output_dir / "coverage.csv")
+    write_html(manifest, output_dir / "index.html")
+    print(f"Generated {output_dir / 'coverage.json'}")
+    print(f"Generated {output_dir / 'coverage.csv'}")
+    print(f"Generated {output_dir / 'index.html'}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

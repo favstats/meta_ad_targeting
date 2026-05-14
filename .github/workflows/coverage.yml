@@ -1,0 +1,46 @@
+name: "Coverage Dashboard"
+
+on:
+  schedule:
+    - cron: "37 3,15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: coverage-dashboard
+  cancel-in-progress: true
+
+jobs:
+  build-coverage-dashboard:
+    name: Build coverage dashboard
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
+    steps:
+      - name: Setup - Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Build coverage manifest and dashboard
+        run: python scripts/build_coverage_dashboard.py --output coverage
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: meta-scraper-coverage
+          path: coverage/
+
+      - name: Publish dashboard release assets
+        run: |
+          if ! gh release view coverage-dashboard >/dev/null 2>&1; then
+            gh release create coverage-dashboard \
+              --title "Coverage Dashboard" \
+              --notes "GitHub-only scraper coverage artifacts. Generated from release assets and workflow metadata; no Meta endpoints are called."
+          fi
+          gh release upload coverage-dashboard \
+            coverage/coverage.json \
+            coverage/coverage.csv \
+            coverage/index.html \
+            --clobber
