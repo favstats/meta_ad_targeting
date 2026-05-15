@@ -44,3 +44,32 @@ jobs:
             coverage/coverage.csv \
             coverage/index.html \
             --clobber
+
+      - name: Publish GitHub Pages branch
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          pages_dir="$RUNNER_TEMP/gh-pages"
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git clone --depth 1 --branch gh-pages "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$pages_dir"
+          else
+            git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$pages_dir"
+            cd "$pages_dir"
+            git switch --orphan gh-pages
+            git rm -rf . >/dev/null 2>&1 || true
+            cd -
+          fi
+
+          find "$pages_dir" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp coverage/coverage.json coverage/coverage.csv coverage/index.html "$pages_dir"/
+          touch "$pages_dir/.nojekyll"
+
+          cd "$pages_dir"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No Pages changes to publish."
+            exit 0
+          fi
+          git commit -m "Publish coverage dashboard"
+          git push origin gh-pages
