@@ -567,7 +567,12 @@ def heatmap_payload(manifest: dict[str, Any]) -> dict[str, Any]:
 
 
 def write_html(manifest: dict[str, Any], path: Path) -> None:
-    heatmap_json = html.escape(json.dumps(heatmap_payload(manifest), separators=(",", ":")))
+    heatmap_json = (
+        json.dumps(heatmap_payload(manifest), separators=(",", ":"))
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+    )
     template = """<!doctype html>
 <html lang="en">
 <head>
