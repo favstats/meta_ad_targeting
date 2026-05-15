@@ -579,6 +579,7 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Meta Scraper Coverage</title>
+  <link rel="icon" href="data:,">
   <style>
     :root { --ink:#17202a; --muted:#627083; --line:#d9e0e7; --paper:#fff; --soft:#f4f7fa; --ok:#16794c; --warn:#a15c00; --bad:#b3261e; --skip:#596579; --run:#3867b7; }
     * { box-sizing: border-box; }
@@ -603,8 +604,15 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
     .legend { display:flex; flex-wrap:wrap; gap:10px; margin:10px 0 12px; color:var(--muted); }
     .key { display:inline-flex; align-items:center; gap:6px; }
     .swatch { width:14px; height:14px; border-radius:3px; border:1px solid rgba(0,0,0,.08); }
-    .heatmap-wrap { overflow:auto; max-height:760px; border:1px solid var(--line); border-radius:8px; background:var(--paper); }
-    #heatmap { display:block; }
+    .heatmap-shell { border:1px solid var(--line); border-radius:8px; background:var(--paper); overflow:hidden; }
+    .heatmap-head { display:grid; grid-template-columns:72px minmax(0,1fr); border-bottom:1px solid var(--line); background:#f8fafc; }
+    .heatmap-corner { height:58px; display:flex; align-items:end; padding:0 10px 10px; border-right:1px solid var(--line); color:var(--muted); font-size:12px; font-weight:650; text-transform:uppercase; }
+    .hm-axis-viewport { height:58px; overflow:hidden; position:relative; }
+    .heatmap-body { display:grid; grid-template-columns:72px minmax(0,1fr); max-height:720px; }
+    .hm-label-viewport { overflow:hidden; border-right:1px solid var(--line); background:#fff; }
+    .hm-scroll { overflow:auto; max-height:720px; background:#fff; }
+    #hmXAxis, #hmYAxis, #heatmap { display:block; transform-origin:0 0; }
+    #hmXAxis, #hmYAxis { will-change:transform; }
     #hmTip { min-height:24px; margin:8px 0 0; color:var(--muted); }
     .table-wrap { overflow:auto; border:1px solid var(--line); border-radius:8px; background:var(--paper); }
     table { border-collapse:collapse; min-width:940px; width:100%; }
@@ -636,6 +644,7 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
         <label>Dataset <select id="hmDataset"><option value="reports">reports</option><option value="targeting">targeting</option></select></label>
         <label>Window <select id="hmWindow"></select></label>
         <label>Range <select id="hmRange"><option value="90">90 days</option><option value="180">180 days</option><option value="365" selected>365 days</option><option value="all">all</option></select></label>
+        <label>Density <select id="hmDensity"><option value="readable" selected>readable</option><option value="compact">compact</option><option value="wide">wide</option></select></label>
         <label>Sort <select id="hmSort"><option value="country">country</option><option value="status">status</option></select></label>
       </div>
       <div class="legend">
@@ -644,8 +653,21 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
         <span class="key"><span class="swatch" style="background:#d6dde6"></span>no source / skipped</span>
         <span class="key"><span class="swatch" style="background:#f3f6f8"></span>missing</span>
       </div>
-      <div class="heatmap-wrap">
-        <canvas id="heatmap" width="1200" height="600"></canvas>
+      <div class="heatmap-shell">
+        <div class="heatmap-head">
+          <div class="heatmap-corner">Country</div>
+          <div class="hm-axis-viewport" id="hmAxisViewport">
+            <canvas id="hmXAxis" width="1200" height="58"></canvas>
+          </div>
+        </div>
+        <div class="heatmap-body">
+          <div class="hm-label-viewport" id="hmLabelViewport">
+            <canvas id="hmYAxis" width="72" height="600"></canvas>
+          </div>
+          <div class="hm-scroll" id="hmScroll">
+            <canvas id="heatmap" width="1200" height="600"></canvas>
+          </div>
+        </div>
       </div>
       <p id="hmTip"></p>
     </section>
@@ -675,16 +697,28 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
     const hmDataset = document.getElementById('hmDataset');
     const hmWindow = document.getElementById('hmWindow');
     const hmRange = document.getElementById('hmRange');
+    const hmDensity = document.getElementById('hmDensity');
     const hmSort = document.getElementById('hmSort');
     const canvas = document.getElementById('heatmap');
+    const axisCanvas = document.getElementById('hmXAxis');
+    const labelCanvas = document.getElementById('hmYAxis');
+    const scrollEl = document.getElementById('hmScroll');
+    const labelViewport = document.getElementById('hmLabelViewport');
+    const heatmapBody = document.querySelector('.heatmap-body');
     const tip = document.getElementById('hmTip');
     const ctx = canvas.getContext('2d');
+    const axisCtx = axisCanvas.getContext('2d');
+    const labelCtx = labelCanvas.getContext('2d');
     const colors = {
       available: '#16794c',
       sourceOnly: '#e0a321',
       noSource: '#d6dde6',
       missing: '#f3f6f8',
       line: '#d9e0e7',
+      majorLine: '#9aa7b5',
+      stripe: '#fafcfe',
+      axisBg: '#f8fafc',
+      axisBand: '#edf3f7',
       text: '#17202a',
       muted: '#627083'
     };
@@ -727,6 +761,45 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
 
     function monthLabel(date) {
       return date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+    }
+
+    function setCanvasSize(targetCanvas, targetCtx, cssW, cssH) {
+      const ratio = window.devicePixelRatio || 1;
+      targetCanvas.style.width = `${cssW}px`;
+      targetCanvas.style.height = `${cssH}px`;
+      targetCanvas.width = Math.ceil(cssW * ratio);
+      targetCanvas.height = Math.ceil(cssH * ratio);
+      targetCtx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      targetCtx.clearRect(0, 0, cssW, cssH);
+    }
+
+    function heatmapCellWidth(dateCount) {
+      const base = hmRange.value === '90' ? 10 : hmRange.value === '180' ? 8 : hmRange.value === '365' ? 6 : (dateCount > 800 ? 4 : 5);
+      const multiplier = hmDensity.value === 'compact' ? 0.7 : hmDensity.value === 'wide' ? 1.35 : 1;
+      return Math.max(2, Math.round(base * multiplier));
+    }
+
+    function segments(dates, precision) {
+      if (!dates.length) return [];
+      const keyFor = date => precision === 'year' ? date.slice(0, 4) : date.slice(0, 7);
+      const out = [];
+      let key = keyFor(dates[0]);
+      let start = 0;
+      for (let index = 1; index <= dates.length; index += 1) {
+        const nextKey = index < dates.length ? keyFor(dates[index]) : null;
+        if (nextKey === key) continue;
+        out.push({ key, start, end: index - 1, width: index - start });
+        key = nextKey;
+        start = index;
+      }
+      return out;
+    }
+
+    function statusColor(row) {
+      if (row.status === 'fresh') return colors.available;
+      if (row.status === 'lagging' || row.status === 'behind_source') return colors.sourceOnly;
+      if (row.status === 'skipped_no_source' || row.status === 'empty_release') return colors.noSource;
+      return '#b3261e';
     }
 
     function selectedRows() {
@@ -777,56 +850,127 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
       return colors.missing;
     }
 
+    function drawXAxis(dates, cellW, chartW, axisH) {
+      setCanvasSize(axisCanvas, axisCtx, chartW, axisH);
+      axisCtx.fillStyle = colors.axisBg;
+      axisCtx.fillRect(0, 0, chartW, axisH);
+      axisCtx.fillStyle = colors.axisBand;
+      axisCtx.fillRect(0, 0, chartW, 23);
+      axisCtx.textBaseline = 'middle';
+      axisCtx.textAlign = 'center';
+
+      segments(dates, 'year').forEach(segment => {
+        const x = segment.start * cellW;
+        const width = segment.width * cellW;
+        axisCtx.fillStyle = colors.majorLine;
+        axisCtx.fillRect(x, 0, 1, axisH);
+        if (width >= 32) {
+          axisCtx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+          axisCtx.fillStyle = colors.text;
+          axisCtx.fillText(segment.key, x + width / 2, 11);
+        }
+      });
+
+      segments(dates, 'month').forEach(segment => {
+        const x = segment.start * cellW;
+        const width = segment.width * cellW;
+        const date = parseDate(`${segment.key}-01`);
+        const month = date.getUTCMonth();
+        const shouldLabel = width >= 28 || month % 3 === 0;
+        axisCtx.fillStyle = month === 0 ? colors.majorLine : colors.line;
+        axisCtx.fillRect(x, 23, month === 0 ? 2 : 1, axisH - 23);
+        if (shouldLabel && width >= 16) {
+          axisCtx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+          axisCtx.fillStyle = colors.muted;
+          axisCtx.fillText(month === 0 ? `${monthLabel(date)} ${date.getUTCFullYear()}` : monthLabel(date), x + width / 2, 41);
+        }
+      });
+    }
+
+    function drawLabels(rows, rowH, labelW, chartH) {
+      setCanvasSize(labelCanvas, labelCtx, labelW, chartH);
+      labelCtx.fillStyle = '#ffffff';
+      labelCtx.fillRect(0, 0, labelW, chartH);
+      labelCtx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      labelCtx.textBaseline = 'middle';
+      rows.forEach((row, rowIndex) => {
+        const y = rowIndex * rowH;
+        if (rowIndex % 2 === 1) {
+          labelCtx.fillStyle = colors.stripe;
+          labelCtx.fillRect(0, y, labelW, rowH);
+        }
+        labelCtx.fillStyle = statusColor(row);
+        labelCtx.fillRect(8, y + Math.max(2, rowH / 2 - 3), 6, 6);
+        labelCtx.fillStyle = colors.text;
+        labelCtx.fillText(row.country, 22, y + rowH / 2);
+      });
+    }
+
+    function drawGrid(rows, dates, cellW, rowH, chartW, chartH) {
+      setCanvasSize(canvas, ctx, chartW, chartH);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, chartW, chartH);
+
+      rows.forEach((row, rowIndex) => {
+        const y = rowIndex * rowH;
+        if (rowIndex % 2 === 1) {
+          ctx.fillStyle = colors.stripe;
+          ctx.fillRect(0, y, chartW, rowH);
+        }
+        dates.forEach((date, dateIndex) => {
+          ctx.fillStyle = cellColor(row, date);
+          ctx.fillRect(dateIndex * cellW, y + 1, Math.max(1, cellW - 1), rowH - 2);
+        });
+      });
+
+      segments(dates, 'month').forEach(segment => {
+        const month = parseDate(`${segment.key}-01`).getUTCMonth();
+        ctx.fillStyle = month === 0 ? colors.majorLine : colors.line;
+        ctx.fillRect(segment.start * cellW, 0, month === 0 ? 2 : 1, chartH);
+      });
+
+      for (let rowIndex = 10; rowIndex < rows.length; rowIndex += 10) {
+        ctx.fillStyle = colors.line;
+        ctx.fillRect(0, rowIndex * rowH, chartW, 1);
+      }
+    }
+
+    function syncScrollChrome() {
+      axisCanvas.style.transform = `translateX(${-scrollEl.scrollLeft}px)`;
+      labelCanvas.style.transform = `translateY(${-scrollEl.scrollTop}px)`;
+    }
+
     function drawHeatmap() {
+      const keepLatestVisible = !drawState || scrollEl.scrollLeft + scrollEl.clientWidth >= scrollEl.scrollWidth - 24;
       const rows = selectedRows().map(row => ({
         ...row,
         dateSet: rangeDateSet(row.ranges),
         sourceDateSet: rangeDateSet(row.source_ranges)
       }));
       const dates = visibleDates(rows);
-      const labelW = 58;
-      const topH = 28;
-      const rowH = 8;
-      const cellW = dates.length <= 95 ? 8 : dates.length <= 190 ? 5 : dates.length <= 370 ? 3 : 2;
-      const cssW = labelW + dates.length * cellW + 16;
-      const cssH = topH + rows.length * rowH + 18;
-      const ratio = window.devicePixelRatio || 1;
-      canvas.style.width = `${cssW}px`;
-      canvas.style.height = `${cssH}px`;
-      canvas.width = Math.ceil(cssW * ratio);
-      canvas.height = Math.ceil(cssH * ratio);
-      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-      ctx.clearRect(0, 0, cssW, cssH);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, cssW, cssH);
-      ctx.font = '10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-      ctx.textBaseline = 'middle';
+      const labelW = 72;
+      const axisH = 58;
+      const rowH = 10;
+      const cellW = heatmapCellWidth(dates.length);
+      const chartW = Math.max(1, dates.length * cellW);
+      const chartH = Math.max(1, rows.length * rowH);
+      const viewportH = Math.min(720, chartH);
+      heatmapBody.style.height = `${viewportH}px`;
+      labelViewport.style.height = `${viewportH}px`;
+      scrollEl.style.maxHeight = `${viewportH}px`;
 
-      dates.forEach((date, index) => {
-        const x = labelW + index * cellW;
-        if (date.endsWith('-01')) {
-          ctx.fillStyle = colors.line;
-          ctx.fillRect(x, topH - 14, 1, rows.length * rowH + 14);
-          ctx.save();
-          ctx.translate(x + 2, 10);
-          ctx.rotate(-Math.PI / 5);
-          ctx.fillStyle = colors.muted;
-          ctx.fillText(monthLabel(parseDate(date)), 0, 0);
-          ctx.restore();
-        }
-      });
+      drawXAxis(dates, cellW, chartW, axisH);
+      drawLabels(rows, rowH, labelW, chartH);
+      drawGrid(rows, dates, cellW, rowH, chartW, chartH);
 
-      rows.forEach((row, rowIndex) => {
-        const y = topH + rowIndex * rowH;
-        ctx.fillStyle = colors.text;
-        ctx.fillText(row.country, 8, y + rowH / 2);
-        dates.forEach((date, dateIndex) => {
-          ctx.fillStyle = cellColor(row, date);
-          ctx.fillRect(labelW + dateIndex * cellW, y, Math.max(1, cellW - 0.5), rowH - 1);
+      drawState = { rows, dates, rowH, cellW };
+      syncScrollChrome();
+      if (keepLatestVisible) {
+        requestAnimationFrame(() => {
+          scrollEl.scrollLeft = scrollEl.scrollWidth;
+          syncScrollChrome();
         });
-      });
-
-      drawState = { rows, dates, labelW, topH, rowH, cellW };
+      }
       tip.textContent = `${rows.length} countries x ${dates.length} days for ${hmDataset.value} ${hmWindow.value}.`;
     }
 
@@ -835,8 +979,8 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
       const rect = canvas.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
-      const dateIndex = Math.floor((x - drawState.labelW) / drawState.cellW);
-      const rowIndex = Math.floor((y - drawState.topH) / drawState.rowH);
+      const dateIndex = Math.floor(x / drawState.cellW);
+      const rowIndex = Math.floor(y / drawState.rowH);
       if (dateIndex < 0 || rowIndex < 0 || dateIndex >= drawState.dates.length || rowIndex >= drawState.rows.length) {
         tip.textContent = `${drawState.rows.length} countries x ${drawState.dates.length} days for ${hmDataset.value} ${hmWindow.value}.`;
         return;
@@ -847,7 +991,9 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
       tip.textContent = `${row.country} ${row.dataset} ${row.window} ${date}: ${state} (${row.status})`;
     });
 
-    [hmDataset, hmRange, hmSort].forEach(element => element.addEventListener('change', () => {
+    scrollEl.addEventListener('scroll', syncScrollChrome, { passive: true });
+
+    [hmDataset, hmRange, hmDensity, hmSort].forEach(element => element.addEventListener('change', () => {
       if (element === hmDataset) updateWindowOptions();
       drawHeatmap();
     }));
