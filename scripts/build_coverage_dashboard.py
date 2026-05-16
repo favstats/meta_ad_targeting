@@ -26,17 +26,18 @@ from typing import Any
 
 
 API_ROOT = "https://api.github.com"
-REPORTS_REPO = "favstats/meta_ad_reports2"
+REPORTS_REPOS = ("favstats/meta_ad_reports2", "favstats/meta_ad_reports")
+REPORTS_PRIMARY_REPO = REPORTS_REPOS[0]
 TARGETING_REPO = "favstats/meta_ad_targeting"
 
 REPORT_WINDOWS = ("yesterday", "last_7_days", "last_30_days", "last_90_days", "lifelong")
 TARGETING_WINDOWS = ("last_7_days", "last_30_days", "last_90_days")
 WORKFLOWS = (
-    (REPORTS_REPO, "reports", "yesterday", "reportsyesterday.yml", "Reports Yesterday"),
-    (REPORTS_REPO, "reports", "last_7_days", "reports7.yml", "Reports 7"),
-    (REPORTS_REPO, "reports", "last_30_days", "reports30.yml", "Reports 30"),
-    (REPORTS_REPO, "reports", "last_90_days", "reports90.yml", "Reports 90"),
-    (REPORTS_REPO, "reports", "lifelong", "reportslifelong.yml", "Reports Lifelong"),
+    (REPORTS_PRIMARY_REPO, "reports", "yesterday", "reportsyesterday.yml", "Reports Yesterday"),
+    (REPORTS_PRIMARY_REPO, "reports", "last_7_days", "reports7.yml", "Reports 7"),
+    (REPORTS_PRIMARY_REPO, "reports", "last_30_days", "reports30.yml", "Reports 30"),
+    (REPORTS_PRIMARY_REPO, "reports", "last_90_days", "reports90.yml", "Reports 90"),
+    (REPORTS_PRIMARY_REPO, "reports", "lifelong", "reportslifelong.yml", "Reports Lifelong"),
     (TARGETING_REPO, "targeting", "last_7_days", "targeting7.yml", "Targeting 7"),
     (TARGETING_REPO, "targeting", "last_30_days", "targeting30.yml", "Targeting 30"),
     (TARGETING_REPO, "targeting", "last_90_days", "targeting90.yml", "Targeting 90"),
@@ -141,7 +142,21 @@ def lag_days(latest: str | None, expected: str | None) -> int | None:
     return None if latest_date is None or expected_date is None else (expected_date - latest_date).days
 
 
-def inventory(releases: list[dict[str, Any]], dataset: str) -> dict[str, dict[str, dict[str, Any]]]:
+def dates_from_ranges(ranges: list[list[str]]) -> list[str]:
+    dates = []
+    for start, end in ranges:
+        start_date = date_or_none(start)
+        end_date = date_or_none(end)
+        if start_date is None or end_date is None:
+            continue
+        current = start_date
+        while current <= end_date:
+            dates.append(current.isoformat())
+            current += dt.timedelta(days=1)
+    return dates
+
+
+def inventory(releases: list[dict[str, Any]], dataset: str, source_repo: str) -> dict[str, dict[str, dict[str, Any]]]:
     by_country: dict[str, dict[str, dict[str, Any]]] = {}
     for release in releases:
         tag = release.get("tag_name") or ""
@@ -185,6 +200,17 @@ def inventory(releases: list[dict[str, Any]], dataset: str) -> dict[str, dict[st
         by_country.setdefault(country, {})[window] = {
             "tag": tag,
             "html_url": release.get("html_url"),
+            "source_repo": source_repo,
+            "source_repos": [source_repo],
+            "release_sources": [
+                {
+                    "repo": source_repo,
+                    "tag": tag,
+                    "html_url": release.get("html_url"),
+                    "dated_asset_count": len(dated),
+                    "latest_data_date": latest.get("date"),
+                }
+            ],
             "asset_count": len(assets),
             "dated_asset_count": len(dated),
             "latest_data_date": latest.get("date"),
@@ -192,8 +218,53 @@ def inventory(releases: list[dict[str, Any]], dataset: str) -> dict[str, dict[st
             "latest_asset_updated_at": latest.get("updated_at"),
             "latest_asset_size": latest.get("size"),
             "available_ranges": date_ranges(available_dates),
+            "_available_dates": available_dates,
         }
     return by_country
+
+
+def merge_release_entries(country: str, window: str, entries: list[dict[str, Any]]) -> dict[str, Any]:
+    if not entries:
+        return {}
+
+    available_dates = sorted({date for entry in entries for date in entry.get("_available_dates", dates_from_ranges(entry.get("available_ranges", [])))})
+    sources = [source for entry in entries for source in entry.get("release_sources", [])]
+    source_repos = sorted({source.get("repo") for source in sources if source.get("repo")})
+    latest_entry = max(
+        entries,
+        key=lambda entry: entry.get("latest_data_date") or "",
+    )
+    latest_source = max(
+        sources,
+        key=lambda source: source.get("latest_data_date") or "",
+    ) if sources else {}
+
+    return {
+        "tag": f"{country}-{window}",
+        "html_url": latest_source.get("html_url") or latest_entry.get("html_url"),
+        "source_repo": latest_source.get("repo") or latest_entry.get("source_repo"),
+        "source_repos": source_repos,
+        "release_sources": sorted(sources, key=lambda source: (source.get("repo") or "", source.get("tag") or "")),
+        "asset_count": sum(entry.get("asset_count", 0) for entry in entries),
+        "dated_asset_count": len(available_dates),
+        "latest_data_date": latest_entry.get("latest_data_date"),
+        "latest_asset_name": latest_entry.get("latest_asset_name"),
+        "latest_asset_updated_at": latest_entry.get("latest_asset_updated_at"),
+        "latest_asset_size": latest_entry.get("latest_asset_size"),
+        "available_ranges": date_ranges(available_dates),
+        "_available_dates": available_dates,
+    }
+
+
+def merge_inventories(inventories: list[dict[str, dict[str, dict[str, Any]]]]) -> dict[str, dict[str, dict[str, Any]]]:
+    countries = sorted({country for inventory_item in inventories for country in inventory_item})
+    merged: dict[str, dict[str, dict[str, Any]]] = {}
+    for country in countries:
+        windows = sorted({window for inventory_item in inventories for window in inventory_item.get(country, {})})
+        for window in windows:
+            entries = [inventory_item[country][window] for inventory_item in inventories if window in inventory_item.get(country, {})]
+            merged.setdefault(country, {})[window] = merge_release_entries(country, window, entries)
+    return merged
 
 
 def release_tags(client: GitHub, repo: str, windows: tuple[str, ...]) -> list[str]:
@@ -227,10 +298,15 @@ def releases_for_tags(client: GitHub, repo: str, tags: list[str]) -> list[dict[s
 
 
 def releases_for_repo(client: GitHub, repo: str) -> list[dict[str, Any]]:
-    env_name = "COVERAGE_REPORTS_PER_PAGE" if repo == REPORTS_REPO else "COVERAGE_TARGETING_PER_PAGE"
+    env_name = "COVERAGE_REPORTS_PER_PAGE" if repo in REPORTS_REPOS else "COVERAGE_TARGETING_PER_PAGE"
     default = "10"
     per_page = max(1, min(100, int(os.environ.get(env_name, os.environ.get("COVERAGE_RELEASES_PER_PAGE", default)))))
-    return client.paginate(f"/repos/{repo}/releases?per_page={per_page}")
+    try:
+        return client.paginate(f"/repos/{repo}/releases?per_page={per_page}")
+    except Exception as exc:
+        windows = REPORT_WINDOWS if repo in REPORTS_REPOS else TARGETING_WINDOWS
+        print(f"warning: release listing failed for {repo}; falling back to tag fetches: {exc}", file=sys.stderr)
+        return releases_for_tags(client, repo, release_tags(client, repo, windows))
 
 
 def expected_dates(rows: dict[str, dict[str, dict[str, Any]]], windows: tuple[str, ...]) -> dict[str, str | None]:
@@ -299,6 +375,7 @@ def coverage_rows(
             item["source_dated_asset_count"] = source.get("dated_asset_count", 0)
             item["source_status"] = report_status(source, report_expected.get(window))
             item["source_available_ranges"] = source.get("available_ranges", [])
+            item["source_repo_sources"] = source.get("source_repos", [])
             out.append(item)
 
     return out, {"reports": report_expected, "targeting": targeting_expected}
@@ -320,12 +397,15 @@ def row(country: str, dataset: str, window: str, release: dict[str, Any], expect
         "latest_asset_updated_at": release.get("latest_asset_updated_at"),
         "latest_asset_size": release.get("latest_asset_size"),
         "available_ranges": release.get("available_ranges", []),
+        "repo_sources": release.get("source_repos", []),
+        "release_sources": release.get("release_sources", []),
         "tag": release.get("tag") or f"{country}-{window}",
         "release_url": release.get("html_url"),
         "source_latest_data_date": None,
         "source_dated_asset_count": None,
         "source_status": None,
         "source_available_ranges": [],
+        "source_repo_sources": [],
     }
 
 
@@ -346,6 +426,100 @@ def summaries(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             }
         )
     return out
+
+
+def previous_completed_months(anchor: dt.date, count: int = 2) -> list[tuple[dt.date, dt.date]]:
+    periods = []
+    cursor = anchor.replace(day=1) - dt.timedelta(days=1)
+    for _ in range(count):
+        start = cursor.replace(day=1)
+        periods.append((start, cursor))
+        cursor = start - dt.timedelta(days=1)
+    return list(reversed(periods))
+
+
+def date_span(start: dt.date, end: dt.date) -> list[dt.date]:
+    return [start + dt.timedelta(days=index) for index in range((end - start).days + 1)]
+
+
+def missing_runs(missing_dates: list[dt.date]) -> list[list[str]]:
+    if not missing_dates:
+        return []
+    sorted_dates = sorted(missing_dates)
+    runs = []
+    start = sorted_dates[0]
+    previous = sorted_dates[0]
+    for current in sorted_dates[1:]:
+        if current == previous + dt.timedelta(days=1):
+            previous = current
+            continue
+        runs.append([start.isoformat(), previous.isoformat()])
+        start = current
+        previous = current
+    runs.append([start.isoformat(), previous.isoformat()])
+    return runs
+
+
+def gap_summary(rows: list[dict[str, Any]], generated_at: str) -> dict[str, Any]:
+    generated_date = date_or_none(generated_at[:10]) or dt.date.today()
+    periods = previous_completed_months(generated_date)
+    period_dates = [date for start, end in periods for date in date_span(start, end)]
+    report_rows = [row for row in rows if row["dataset"] == "reports"]
+    summaries_by_window = []
+
+    for window in REPORT_WINDOWS:
+        selected = [row for row in report_rows if row["window"] == window]
+        active = [row for row in selected if row.get("dated_asset_count", 0) > 0]
+        top_countries = []
+        missing_by_date: dict[str, int] = {}
+        countries_with_gaps = 0
+        total_missing_days = 0
+
+        for item in active:
+            available = {date_or_none(value) for value in dates_from_ranges(item.get("available_ranges", []))}
+            available.discard(None)
+            missing = [date for date in period_dates if date not in available]
+            if not missing:
+                continue
+            countries_with_gaps += 1
+            total_missing_days += len(missing)
+            for missing_date in missing:
+                key = missing_date.isoformat()
+                missing_by_date[key] = missing_by_date.get(key, 0) + 1
+            top_countries.append(
+                {
+                    "country": item["country"],
+                    "missing_days": len(missing),
+                    "status": item["status"],
+                    "latest_data_date": item.get("latest_data_date"),
+                    "missing_ranges": missing_runs(missing)[:6],
+                    "repo_sources": item.get("repo_sources", []),
+                }
+            )
+
+        top_dates = sorted(missing_by_date.items(), key=lambda pair: (-pair[1], pair[0]))[:12]
+        top_countries.sort(key=lambda item: (-item["missing_days"], item["country"]))
+        summaries_by_window.append(
+            {
+                "dataset": "reports",
+                "window": window,
+                "period_start": periods[0][0].isoformat(),
+                "period_end": periods[-1][1].isoformat(),
+                "active_count": len(active),
+                "empty_count": len(selected) - len(active),
+                "complete_count": len(active) - countries_with_gaps,
+                "countries_with_gaps": countries_with_gaps,
+                "total_missing_days": total_missing_days,
+                "max_missing_countries_per_date": max(missing_by_date.values()) if missing_by_date else 0,
+                "top_dates": [{"date": date, "missing_countries": count} for date, count in top_dates],
+                "top_countries": top_countries[:20],
+            }
+        )
+
+    return {
+        "periods": [{"start": start.isoformat(), "end": end.isoformat()} for start, end in periods],
+        "summary": summaries_by_window,
+    }
 
 
 def workflow_runs(client: GitHub) -> list[dict[str, Any]]:
@@ -403,21 +577,26 @@ def workflow_runs(client: GitHub) -> list[dict[str, Any]]:
 
 
 def build_manifest(client: GitHub) -> dict[str, Any]:
-    reports = inventory(releases_for_repo(client, REPORTS_REPO), "reports")
-    targeting = inventory(releases_for_repo(client, TARGETING_REPO), "targeting")
+    report_inventories = [inventory(releases_for_repo(client, repo), "reports", repo) for repo in REPORTS_REPOS]
+    reports = merge_inventories(report_inventories)
+    targeting = inventory(releases_for_repo(client, TARGETING_REPO), "targeting", TARGETING_REPO)
     rows, expected = coverage_rows(reports, targeting)
     rows.sort(key=lambda x: (x["dataset"], x["window"], x["status"], x["country"]))
+    generated_at = now_utc()
     return {
-        "generated_at": now_utc(),
+        "generated_at": generated_at,
         "note": "GitHub-only coverage: release assets and workflow run metadata; no Meta endpoints are called.",
         "repos": {
-            "reports": REPORTS_REPO,
+            "reports": list(REPORTS_REPOS),
+            "reports_primary": REPORTS_PRIMARY_REPO,
+            "reports_legacy": REPORTS_REPOS[1],
             "targeting": TARGETING_REPO,
             "vpn_us": "favstats/metaus",
             "vpn_de": "favstats/metade",
         },
         "expected_dates": expected,
         "summary": summaries(rows),
+        "gap_summary": gap_summary(rows, generated_at),
         "coverage": rows,
         "workflows": workflow_runs(client),
     }
@@ -437,9 +616,11 @@ def write_csv(rows: list[dict[str, Any]], path: Path) -> None:
         "latest_asset_name",
         "latest_asset_updated_at",
         "latest_asset_size",
+        "repo_sources",
         "source_latest_data_date",
         "source_dated_asset_count",
         "source_status",
+        "source_repo_sources",
         "tag",
         "release_url",
     ]
@@ -493,6 +674,30 @@ def render_summary(manifest: dict[str, Any]) -> str:
     return "\n".join(cards)
 
 
+def render_gap_summary(manifest: dict[str, Any]) -> str:
+    gap_data = manifest.get("gap_summary", {})
+    rows = []
+    for item in gap_data.get("summary", []):
+        top_dates = ", ".join(f"{entry['date']} ({entry['missing_countries']})" for entry in item.get("top_dates", [])[:4])
+        top_countries = ", ".join(
+            f"{entry['country']} ({entry['missing_days']})"
+            for entry in item.get("top_countries", [])[:6]
+        )
+        rows.append(
+            "<tr>"
+            f"<td>{html.escape(item['window'])}</td>"
+            f"<td>{html.escape(item['period_start'])} to {html.escape(item['period_end'])}</td>"
+            f"<td>{item['complete_count']}/{item['active_count']}</td>"
+            f"<td>{item['countries_with_gaps']}</td>"
+            f"<td>{item['total_missing_days']}</td>"
+            f"<td>{item['max_missing_countries_per_date']}</td>"
+            f"<td>{html.escape(top_dates)}</td>"
+            f"<td>{html.escape(top_countries)}</td>"
+            "</tr>"
+        )
+    return "\n".join(rows)
+
+
 def render_workflows(manifest: dict[str, Any]) -> str:
     rows = []
     for item in manifest["workflows"]:
@@ -527,6 +732,7 @@ def render_rows(manifest: dict[str, Any]) -> str:
     for item in rows[:HTML_ROW_LIMIT]:
         url = item.get("release_url") or "#"
         lag = "" if item.get("lag_days") is None else str(item["lag_days"])
+        repos = ", ".join(item.get("repo_sources") or item.get("source_repo_sources") or [])
         rendered.append(
             "<tr>"
             f"<td>{html.escape(item['country'])}</td>"
@@ -537,6 +743,7 @@ def render_rows(manifest: dict[str, Any]) -> str:
             f"<td>{html.escape(str(item.get('expected_data_date') or ''))}</td>"
             f"<td>{html.escape(lag)}</td>"
             f"<td>{html.escape(str(item.get('source_latest_data_date') or ''))}</td>"
+            f"<td>{html.escape(repos)}</td>"
             f'<td><a href="{html.escape(url)}">{html.escape(item["tag"])}</a></td>'
             "</tr>"
         )
@@ -557,6 +764,8 @@ def heatmap_payload(manifest: dict[str, Any]) -> dict[str, Any]:
                 "latest": item.get("latest_data_date"),
                 "expected": item.get("expected_data_date"),
                 "source_latest": item.get("source_latest_data_date"),
+                "repo_sources": item.get("repo_sources", []),
+                "source_repo_sources": item.get("source_repo_sources", []),
             }
         )
 
@@ -634,12 +843,22 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
 <body>
   <header>
     <h1>Meta Scraper Coverage</h1>
-    <p class="note">Generated __GENERATED_AT__. GitHub-only observability: release assets and workflow metadata, no Meta endpoints.</p>
+    <p class="note">Generated __GENERATED_AT__. GitHub-only observability: release assets and workflow metadata, no Meta endpoints. Report coverage merges __REPORT_REPOS__.</p>
   </header>
   <main>
     <section>
       <h2>Coverage</h2>
       <div class="grid">__SUMMARY__</div>
+    </section>
+    <section>
+      <h2>Backfill Gaps</h2>
+      <p>Previous two completed months, using merged report release assets across current and legacy report repos.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Window</th><th>Period</th><th>Complete Countries</th><th>Countries With Gaps</th><th>Missing Country-Days</th><th>Worst Date Count</th><th>Worst Dates</th><th>Worst Countries</th></tr></thead>
+          <tbody>__GAP_SUMMARY__</tbody>
+        </table>
+      </div>
     </section>
     <section>
       <h2>Master Heatmap</h2>
@@ -689,7 +908,7 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
       <p>Showing the first __ROW_LIMIT__ rows ordered by attention priority. The complete machine-readable manifest is in coverage.json.</p>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Country</th><th>Dataset</th><th>Window</th><th>Status</th><th>Latest</th><th>Expected</th><th>Lag</th><th>Source Latest</th><th>Release</th></tr></thead>
+          <thead><tr><th>Country</th><th>Dataset</th><th>Window</th><th>Status</th><th>Latest</th><th>Expected</th><th>Lag</th><th>Source Latest</th><th>Repos</th><th>Release</th></tr></thead>
           <tbody>__ROWS__</tbody>
         </table>
       </div>
@@ -992,7 +1211,8 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
       const row = drawState.rows[rowIndex];
       const date = drawState.dates[dateIndex];
       const state = row.dateSet.has(date) ? 'available' : (row.dataset === 'targeting' && row.sourceDateSet.has(date) ? 'source report only' : (row.status === 'skipped_no_source' ? 'no source' : 'missing'));
-      tip.textContent = `${row.country} ${row.dataset} ${row.window} ${date}: ${state} (${row.status})`;
+      const repos = (row.repo_sources && row.repo_sources.length) ? ` via ${row.repo_sources.join(', ')}` : '';
+      tip.textContent = `${row.country} ${row.dataset} ${row.window} ${date}: ${state} (${row.status})${repos}`;
     });
 
     scrollEl.addEventListener('scroll', syncScrollChrome, { passive: true });
@@ -1010,7 +1230,9 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
 """
     rendered = (
         template.replace("__GENERATED_AT__", html.escape(manifest["generated_at"]))
+        .replace("__REPORT_REPOS__", html.escape(", ".join(manifest["repos"].get("reports", []))))
         .replace("__SUMMARY__", render_summary(manifest))
+        .replace("__GAP_SUMMARY__", render_gap_summary(manifest))
         .replace("__WORKFLOWS__", render_workflows(manifest))
         .replace("__ROW_LIMIT__", str(HTML_ROW_LIMIT))
         .replace("__ROWS__", render_rows(manifest))
