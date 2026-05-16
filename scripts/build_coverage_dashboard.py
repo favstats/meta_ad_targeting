@@ -47,6 +47,7 @@ WORKFLOWS = (
 
 TAG_RE = re.compile(r"^(?P<country>[A-Z]{2})-(?P<window>yesterday|last_7_days|last_30_days|last_90_days|lifelong)$")
 DATE_ASSET_RE = re.compile(r"^(?P<date>\d{4}-\d{2}-\d{2})\.(?P<ext>rds|zip|parquet)$")
+PLACEHOLDER_DATA_DATES = {"2000-01-01"}
 HTML_ROW_LIMIT = 900
 
 
@@ -162,6 +163,9 @@ def inventory(releases: list[dict[str, Any]], dataset: str) -> dict[str, dict[st
             asset_match = DATE_ASSET_RE.match(asset_name)
             if not asset_match:
                 continue
+            asset_date = asset_match.group("date")
+            if asset_date in PLACEHOLDER_DATA_DATES:
+                continue
             if dataset == "reports" and asset_match.group("ext") != "rds":
                 continue
             if dataset == "targeting" and asset_match.group("ext") != "parquet":
@@ -169,7 +173,7 @@ def inventory(releases: list[dict[str, Any]], dataset: str) -> dict[str, dict[st
             dated.append(
                 {
                     "name": asset_name,
-                    "date": asset_match.group("date"),
+                    "date": asset_date,
                     "updated_at": asset.get("updated_at"),
                     "size": asset.get("size"),
                 }
@@ -649,7 +653,7 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
       </div>
       <div class="legend">
         <span class="key"><span class="swatch" style="background:#16794c"></span>available</span>
-        <span class="key"><span class="swatch" style="background:#e0a321"></span>source only</span>
+        <span class="key" title="For targeting rows: the source reports file exists for that date, but the targeting file does not."><span class="swatch" style="background:#e0a321"></span>source report only</span>
         <span class="key"><span class="swatch" style="background:#d6dde6"></span>no source / skipped</span>
         <span class="key"><span class="swatch" style="background:#f3f6f8"></span>missing</span>
       </div>
@@ -987,7 +991,7 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
       }
       const row = drawState.rows[rowIndex];
       const date = drawState.dates[dateIndex];
-      const state = row.dateSet.has(date) ? 'available' : (row.dataset === 'targeting' && row.sourceDateSet.has(date) ? 'source only' : (row.status === 'skipped_no_source' ? 'no source' : 'missing'));
+      const state = row.dateSet.has(date) ? 'available' : (row.dataset === 'targeting' && row.sourceDateSet.has(date) ? 'source report only' : (row.status === 'skipped_no_source' ? 'no source' : 'missing'));
       tip.textContent = `${row.country} ${row.dataset} ${row.window} ${date}: ${state} (${row.status})`;
     });
 
