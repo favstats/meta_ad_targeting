@@ -106,8 +106,15 @@ the_timelag <- timelag_data %>%
   pull(time_lag) %>% 
   as.numeric()
 
-if(the_timelag>3){
-  
-  post_data_to_slack(timelag_data, thebot)
-  
+# An unset webhook (POST("") is a malformed URL) or an empty time_lag (if() on a
+# zero-length value is an error) used to halt this script, which marked all 204
+# matrix jobs failed over a notification. A job that is red every day carries no
+# signal, and it hid that the data steps above had actually succeeded. Report and
+# carry on instead.
+if (length(the_timelag) != 1 || is.na(the_timelag)) {
+  message("No last_30_days time lag available; skipping Slack notification.")
+} else if (!nzchar(thebot)) {
+  message("SLACKBOT is not set; skipping Slack notification (time lag: ", the_timelag, " days).")
+} else if (the_timelag > 3) {
+  try(post_data_to_slack(timelag_data, thebot))
 }
