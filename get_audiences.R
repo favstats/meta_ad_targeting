@@ -241,7 +241,7 @@ try({
     mutate(spend = parse_number(spend)) %>% 
     arrange(desc(spend))
   
-  for (i in 1:length(togetstuff$page_id)) {
+  for (i in seq_along(togetstuff$page_id)) {
     # Get insights for the current page ID
     jb <- get_page_insights(
       togetstuff$page_id[i], 
