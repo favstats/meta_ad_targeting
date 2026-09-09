@@ -73,3 +73,15 @@ jobs:
           fi
           git commit -m "Publish coverage dashboard"
           git push origin gh-pages
+
+      # Runs last, so a stale-data alert never blocks the dashboard from
+      # publishing. A failure here emails the repo owner - which is the piece
+      # that was missing when the targeting scrapers went quiet for nine days
+      # while every job still reported success.
+      - name: Alert if targeting data has fallen behind its source
+        run: |
+          python scripts/build_coverage_dashboard.py \
+            --check coverage/coverage.json \
+            --max-lag-days 3 \
+            --min-countries 10 \
+            --watch US,DE,NL

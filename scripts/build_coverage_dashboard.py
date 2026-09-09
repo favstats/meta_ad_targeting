@@ -1241,16 +1241,113 @@ def write_html(manifest: dict[str, Any], path: Path) -> None:
     path.write_text(rendered, encoding="utf-8")
 
 
+def staleness_report(rows: list[dict[str, Any]], max_lag_days: int) -> dict[str, Any]:
+    """How far the targeting scrape has fallen behind the report data it derives from.
+
+    The dashboard's own `lag_days` compares each country against the best
+    country, so a global scraper outage shows up as "everyone is equally fresh".
+    This compares each country against its own upstream source instead, which is
+    the signal that actually moves when the scraper stops working.
+    """
+    offenders: list[dict[str, Any]] = []
+    for item in rows:
+        if item.get("dataset") != "targeting":
+            continue
+        target_latest = date_or_none(item.get("latest_data_date"))
+        source_latest = date_or_none(item.get("source_latest_data_date"))
+        if target_latest is None or source_latest is None:
+            continue
+        behind = (source_latest - target_latest).days
+        if behind > max_lag_days:
+            offenders.append(
+                {
+                    "country": item["country"],
+                    "window": item["window"],
+                    "behind_days": behind,
+                    "targeting_latest": item.get("latest_data_date"),
+                    "source_latest": item.get("source_latest_data_date"),
+                }
+            )
+
+    offenders.sort(key=lambda x: (-x["behind_days"], x["country"], x["window"]))
+    return {
+        "max_lag_days": max_lag_days,
+        "offender_count": len(offenders),
+        "countries_affected": sorted({x["country"] for x in offenders}),
+        "worst_behind_days": offenders[0]["behind_days"] if offenders else 0,
+        "offenders": offenders,
+    }
+
+
+def run_staleness_check(
+    manifest_path: Path,
+    max_lag_days: int,
+    min_countries: int,
+    watch: list[str],
+) -> int:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    report = staleness_report(manifest.get("coverage", []), max_lag_days)
+
+    affected = report["countries_affected"]
+    watched_hit = sorted(set(watch) & set(affected))
+
+    print(f"Targeting data more than {max_lag_days} day(s) behind its report source:")
+    print(f"  countries affected : {len(affected)}")
+    print(f"  worst lag          : {report['worst_behind_days']} day(s)")
+    if report["offenders"]:
+        print("  worst offenders    :")
+        for item in report["offenders"][:10]:
+            print(
+                f"    {item['country']} {item['window']}: "
+                f"targeting {item['targeting_latest']} vs source {item['source_latest']} "
+                f"({item['behind_days']}d)"
+            )
+
+    tripped = []
+    if len(affected) >= min_countries:
+        tripped.append(f"{len(affected)} countries behind (threshold {min_countries})")
+    if watched_hit:
+        tripped.append(f"watched countries behind: {', '.join(watched_hit)}")
+
+    if not tripped:
+        print("OK: no staleness alert.")
+        return 0
+
+    print("")
+    print("STALE: " + "; ".join(tripped))
+    print("The targeting scrapers are probably failing. Check a recent")
+    print("'Meta Targeting' job log for the country above before assuming Meta changed.")
+    return 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", default="coverage")
+    parser.add_argument(
+        "--check",
+        metavar="COVERAGE_JSON",
+        help="Skip building; read an existing coverage.json and exit non-zero if targeting data is stale.",
+    )
+    parser.add_argument("--max-lag-days", type=int, default=3)
+    parser.add_argument("--min-countries", type=int, default=10)
+    parser.add_argument(
+        "--watch",
+        default="",
+        help="Comma-separated countries that trip the alert on their own (e.g. US).",
+    )
     args = parser.parse_args()
+
+    watch = [x.strip().upper() for x in args.watch.split(",") if x.strip()]
+
+    if args.check:
+        return run_staleness_check(Path(args.check), args.max_lag_days, args.min_countries, watch)
 
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
     client = GitHub(os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN"))
 
     manifest = build_manifest(client)
+    manifest["staleness"] = staleness_report(manifest["coverage"], args.max_lag_days)
     (output_dir / "coverage.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     write_csv(manifest["coverage"], output_dir / "coverage.csv")
     write_html(manifest, output_dir / "index.html")
