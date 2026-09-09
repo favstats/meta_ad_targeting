@@ -156,7 +156,7 @@ try({
         the_assets <-
           httr::GET(
             paste0(
-              "https://github.com/favstats/meta_ad_reports/releases/expanded_assets/",
+              "https://github.com/favstats/meta_ad_reports2/releases/expanded_assets/",
               .x
             )
           )
@@ -189,7 +189,7 @@ try({
     
     download.file(
       paste0(
-        "https://github.com/favstats/meta_ad_reports/releases/download/",
+        "https://github.com/favstats/meta_ad_reports2/releases/download/",
         sets$cntry,
         "-last_90_days/",
         latest$file_name
