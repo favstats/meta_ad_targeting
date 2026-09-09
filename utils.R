@@ -1,3 +1,5 @@
+source("release_assets.R")
+
 calc_targeting <- function(only_tags, exclude = NULL) {
   
   if(sets$cntry=="TW"){

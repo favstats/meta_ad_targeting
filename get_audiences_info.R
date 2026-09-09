@@ -162,20 +162,7 @@ try({
           )
         
         the_assets %>% httr::content() %>%
-          html_elements(".Box-row") %>%
-          html_text()  %>%
-          tibble(raw = .)   %>%
-          # Split the raw column into separate lines
-          mutate(raw = strsplit(as.character(raw), "\n")) %>%
-          # Extract the relevant lines for filename, file size, and timestamp
-          transmute(
-            filename = sapply(raw, function(x)
-              trimws(x[3])),
-            file_size = sapply(raw, function(x)
-              trimws(x[6])),
-            timestamp = sapply(raw, function(x)
-              trimws(x[7]))
-          ) %>%
+          parse_release_assets() %>%
           filter(filename != "Source code") %>%
           mutate(release = .x) %>%
           mutate_all(as.character)
